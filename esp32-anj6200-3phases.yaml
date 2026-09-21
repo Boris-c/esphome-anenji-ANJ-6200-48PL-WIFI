@@ -1,0 +1,3234 @@
+substitutions:
+  name0: a1
+  name1: a2
+  name2: a3
+  device_description: "Monitor and control an Anenji hybrid inverter via RS232"
+  uart0_tx_pin: GPIO17
+  uart0_rx_pin: GPIO16
+  uart1_tx_pin: GPIO1
+  uart1_rx_pin: GPIO3
+  uart2_tx_pin: GPIO25
+  uart2_rx_pin: GPIO26
+
+globals:
+   - id: slave_output_source_priority_start_time
+     type: uint
+     restore_value: false
+     initial_value: '0'
+
+esphome:
+  name: anj
+  comment: ${device_description}
+  min_version: 2024.6.0
+  project:
+    name: "syssi.esphome-smg-ii"
+    version: 1.2.0
+
+esp32:
+  # board: wemos_d1_mini32
+  # board: esp32dev
+  board: nodemcu-32s
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: "3.1"
+
+wifi:
+  networks:
+  # - ssid: !secret wifi_ssid
+  #   priority: 2
+  #   password: !secret wifi_password
+  #   manual_ip:
+  #     static_ip: 192.168.1.221
+  #     gateway: 192.168.1.1
+  #     subnet: 255.255.255.0
+  - bssid: '00:F7:6F:D2:30:F8' # APE Atelier
+    priority: 1
+    password: !secret wifi_password
+    manual_ip:
+      static_ip: 192.168.1.221
+      gateway: 192.168.1.1
+      subnet: 255.255.255.0
+      dns1: 192.168.1.1
+      dns2: 1.1.1.1
+  - ssid: !secret wifi_ssid
+    priority: 0
+    password: !secret wifi_password
+    manual_ip:
+      static_ip: 192.168.1.221
+      gateway: 192.168.1.1
+      subnet: 255.255.255.0
+      dns1: 192.168.1.1
+      dns2: 1.1.1.1
+
+ota:
+  platform: esphome
+
+logger:
+  level: INFO  # 👈 must be at least as detailed as any per-module setting
+  baud_rate: 0  # disable UART logging
+  logs:
+    preferences: INFO
+    component: INFO
+    modbus: INFO
+    modbus_controller: INFO
+    api.connection: WARN  # to suppress TCP spam
+    modbus_controller.text_sensor: WARN
+    modbus_controller.sensor: WARN
+    modbus_controller.binary_sensor: WARN
+    modbus_controller.select: WARN
+
+# If you use Home Assistant please remove this `mqtt` section and uncomment the `api` component!
+# The native API has many advantages over MQTT: https://esphome.io/components/api.html#advantages-over-mqtt
+# mqtt:
+#   broker: !secret mqtt_host
+#   username: !secret mqtt_username
+#   password: !secret mqtt_password
+#   id: mqtt_client
+
+api:
+
+uart:
+  - id: uart_0
+    <<: &uart_common
+      baud_rate: 9600
+      stop_bits: 1
+      parity: NONE
+      rx_buffer_size: 256
+    tx_pin: ${uart0_tx_pin}
+    rx_pin: ${uart0_rx_pin}
+
+  - id: uart_1
+    <<: *uart_common
+    tx_pin: ${uart1_tx_pin}
+    rx_pin: ${uart1_rx_pin}
+
+  - id: uart_2
+    <<: *uart_common
+    tx_pin: ${uart2_tx_pin}
+    rx_pin: ${uart2_rx_pin}
+    #debug:
+    #  direction: BOTH
+    #  dummy_receiver: false
+
+modbus:
+  - id: modbus0
+    <<: &modbus_common
+      send_wait_time: 200ms
+      turnaround_time: 50ms
+    uart_id: uart_0
+
+  - id: modbus1
+    <<: *modbus_common
+    uart_id: uart_1
+
+  - id: modbus2
+    <<: *modbus_common
+    uart_id: uart_2
+
+modbus_controller:
+  - id: smg0
+    <<: &modbus_controller_common
+      address: 0x01
+      update_interval: 15s
+    modbus_id: modbus0
+
+  - id: smg1
+    <<: *modbus_controller_common
+    modbus_id: modbus1
+
+  - id: smg2
+    <<: *modbus_controller_common
+    modbus_id: modbus2
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+  - platform: sntp
+    timezone: Europe/Paris
+    id: sntp_time
+    on_time:
+      # Every 6 hours, restart ESP (might not be necessary)
+      - seconds: 0
+        minutes: 0
+        hours: 1
+        then:
+          - switch.toggle: restart_espjk
+
+sensor:
+  - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
+    name: "ANJ ESP32 WiFi Signal dB"
+    id: wifi_signal_db
+    entity_category: "diagnostic"
+
+  - platform: copy # Reports the WiFi signal strength in %
+    source_id: wifi_signal_db
+    name: "ANJ ESP32 WiFi Signal Percent"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "Signal %"
+    entity_category: "diagnostic"
+    device_class: ""
+
+  - <<: &PV_energy_today
+      platform: total_daily_energy
+      restore: true
+      icon: mdi:counter
+      filters:
+        # Multiplication factor from W to kW is 0.001
+        - multiply: 0.001
+      unit_of_measurement: kWh
+      accuracy_decimals: 3
+      state_class: total_increasing
+      device_class: energy
+    name: "${name0} PV energy today"
+    power_id: smg0_pv_average_power
+
+  - <<: *PV_energy_today
+    name: "${name1} PV energy today"
+    power_id: smg1_pv_average_power
+
+  - <<: *PV_energy_today
+    name: "${name2} PV energy today"
+    power_id: smg2_pv_average_power
+
+
+  - <<: &EDF_energy_today
+      platform: total_daily_energy
+      restore: true
+      icon: mdi:counter
+      filters:
+        # Multiplication factor from W to kW is 0.001
+        - multiply: 0.001
+      unit_of_measurement: kWh
+      accuracy_decimals: 3
+      state_class: total_increasing
+      device_class: energy
+    name: "${name0} EDF L1 energy today"
+    power_id: smg0_CT_power
+
+  - <<: *EDF_energy_today
+    name: "${name1} EDF L2 energy today"
+    power_id: smg1_CT_power
+
+  - <<: *EDF_energy_today
+    name: "${name2} EDF L3 energy today"
+    power_id: smg2_CT_power
+
+
+  - <<: &battery_energy_today
+      platform: total_daily_energy
+      restore: true
+      icon: mdi:counter
+      filters:
+        # Multiplication factor from W to kW is 0.001
+        - multiply: 0.001
+      unit_of_measurement: kWh
+      accuracy_decimals: 3
+      state_class: total_increasing
+      device_class: energy
+    name: "${name0} battery energy today"
+    power_id: smg0_battery_power
+
+  - <<: *battery_energy_today
+    name: "${name1} battery energy today"
+    power_id: smg1_battery_power
+
+  - <<: *battery_energy_today
+    name: "${name2} battery energy today"
+    power_id: smg2_battery_power
+
+  # Fault code                                                    ULong 100 2 R
+  - <<: &fault_code
+      platform: modbus_controller
+      address: 100
+      register_type: holding
+      value_type: U_DWORD
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} fault code"
+
+  - <<: *fault_code
+    modbus_controller_id: smg1
+    name: "${name1} fault code"
+
+  - <<: *fault_code
+    modbus_controller_id: smg2
+    name: "${name2} fault code"
+
+  # - platform: modbus_controller
+  #   address: 102
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 102"
+  # - platform: modbus_controller
+  #   address: 104
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 104 2048 if F2 21 Eq activated immediately"
+  # - platform: modbus_controller
+  #   address: 106
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 106"
+
+  # Warning code                                                  ULong 108 2 R
+  - <<: &warning_code
+      platform: modbus_controller
+      address: 108
+      register_type: holding
+      value_type: U_DWORD
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} warning code"
+
+  - <<: *warning_code
+    modbus_controller_id: smg1
+    name: "${name1} warning code"
+
+  - <<: *warning_code
+    modbus_controller_id: smg2
+    name: "${name2} warning code"
+
+  # - platform: modbus_controller
+  #   address: 110
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 110"
+
+  - platform: modbus_controller
+    address: 112
+    id: "${name0}112"
+    register_type: holding
+    value_type: U_WORD
+    modbus_controller_id: smg0
+    name: "${name0} 112"
+
+  - platform: modbus_controller
+    address: 113
+    register_type: holding
+    value_type: U_WORD
+    modbus_controller_id: smg0
+    name: "${name0} 113"
+  # - platform: modbus_controller
+  #   address: 114
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 114"
+  # - platform: modbus_controller
+  #   address: 116
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 116"
+  # - platform: modbus_controller
+  #   address: 118
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 118"
+  # - platform: modbus_controller
+  #   address: 120
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 120"
+  # - platform: modbus_controller
+  #   address: 122
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 122"
+  # - platform: modbus_controller
+  #   address: 124
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 124"
+  # - platform: modbus_controller
+  #   address: 126
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 126"
+  # - platform: modbus_controller
+  #   address: 128
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 128"
+  # - platform: modbus_controller
+  #   address: 130
+  #   register_type: holding
+  #   value_type: U_DWORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 130"
+
+  # Operation Mode                                                UInt  201 1 R 0: Power On
+  #                                                                             1: Standby
+  #                                                                             2: Mains
+  #                                                                             3: Off-Grid
+  #                                                                             4: Bypass
+  #                                                                             5: Charging
+  #                                                                             6: Fault
+
+  - platform: modbus_controller
+    address: 184
+    id: "${name0}184Invaliddata2"
+    register_type: holding
+    value_type: U_WORD
+    modbus_controller_id: smg0
+    name: "${name0} 184 Invalid data"
+  # - platform: modbus_controller
+  #   address: 185
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 185"
+
+  - platform: modbus_controller
+    id: "${name0}200_"
+    address: 200
+    register_type: holding
+    value_type: U_WORD
+    modbus_controller_id: smg0
+    name: "${name0} 200 Invalid data Internal command"
+
+  # DC bus voltage                                       0.1V     Uint  218 1 R
+  - <<: &dc_bus_voltage
+      platform: modbus_controller
+      address: 218
+      register_type: holding
+      value_type: U_WORD
+      unit_of_measurement: "V"
+      device_class: voltage
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} DC bus voltage"
+
+  - <<: *dc_bus_voltage
+    modbus_controller_id: smg1
+    name: "${name1} DC bus voltage"
+
+  - <<: *dc_bus_voltage
+    modbus_controller_id: smg2
+    name: "${name2} DC bus voltage"
+    
+  # - platform: modbus_controller
+  #   address: 221
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 221"
+
+  # - platform: modbus_controller
+  #   address: 222
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 222"
+
+  # - platform: modbus_controller
+  #   address: 230
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 230"
+
+  # Power flow status                                     --       UInt  231 1 R
+  # GM6200 / Anenji 6.2 kW variant of the SMG II power-flow flags.
+  # bit0~1 0: PV disconnected; 1: PV connected
+  # bit2~3 0: Mains disconnected; 1: Mains connected; 2: Inverter connected to grid
+  # bit4~5 0: Battery idle; 1: Battery charging; 2: Battery discharging
+  # bit6~7 0: Load not supplied; 1: Load supplied
+  # bit8   0: Not charged by AC; 1: Charged by AC
+  # bit9   0: PV not charging; 1: PV charging
+  # bit10  0: Battery icon on; 1: Battery icon off
+  # bit11  0: PV icon on; 1: PV icon off
+  # bit12  0: Mains icon on; 1: Mains icon off
+  # bit13  0: Load icon on; 1: Load icon off
+  - <<: &power_flow_status_code
+      platform: modbus_controller
+      address: 231
+      register_type: holding
+      value_type: U_WORD
+      accuracy_decimals: 0
+    id: smg0_power_flow_status
+    modbus_controller_id: smg0
+    name: "${name0} power flow status code"
+
+  - <<: *power_flow_status_code
+    id: smg1_power_flow_status
+    modbus_controller_id: smg1
+    name: "${name1} power flow status code"
+
+  - <<: *power_flow_status_code
+    id: smg2_power_flow_status
+    modbus_controller_id: smg2
+    name: "${name2} power flow status code"
+
+  # External CT sampling power                            1W       Int   235 2 R
+  # Keep the historical "CT power" names/entity ids from the former register
+  # 236 sensors; 235 is the real start address of the signed 32-bit value.
+  - <<: &external_ct_sampling_power
+      platform: modbus_controller
+      address: 235
+      register_type: holding
+      value_type: S_DWORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    id: smg0_CT_power
+    modbus_controller_id: smg0
+    name: "${name0} CT power"
+
+  - platform: modbus_controller
+    address: 238
+    register_type: holding
+    value_type: S_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} 238 ?"
+
+
+  - <<: *external_ct_sampling_power
+    id: smg1_CT_power
+    modbus_controller_id: smg1
+    name: "${name1} CT power"
+
+  - platform: modbus_controller
+    address: 238
+    register_type: holding
+    value_type: S_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+    modbus_controller_id: smg1
+    name: "${name0} 238 a2"
+
+
+  - <<: *external_ct_sampling_power
+    id: smg2_CT_power
+    modbus_controller_id: smg2
+    name: "${name2} CT power"
+
+  - platform: modbus_controller
+    address: 238
+    register_type: holding
+    value_type: S_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+    modbus_controller_id: smg2
+    name: "${name0} 238 a3"
+
+  # - platform: modbus_controller
+  #   address: 239
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 239"
+
+  # - platform: modbus_controller
+  #   address: 240
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 240"
+
+  # - platform: modbus_controller
+  #   address: 241
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 241"
+
+  # - platform: modbus_controller
+  #   address: 242
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 242"
+
+  # - platform: modbus_controller
+  #   address: 243
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 243"
+
+  # - platform: modbus_controller
+  #   address: 244
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 244"
+
+  # - platform: modbus_controller
+  #   address: 245
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 245"
+
+  # - platform: modbus_controller
+  #   address: 303
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 303"
+
+  # - platform: modbus_controller
+  #   address: 304
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 304"
+
+  # - platform: modbus_controller
+  #   address: 311
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 311"
+
+  - platform: modbus_controller
+    address: 314
+    register_type: holding
+    value_type: S_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} 314"
+
+  - platform: modbus_controller
+    address: 315
+    register_type: holding
+    value_type: S_WORD
+    state_class: measurement
+    accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} 315"
+  # - platform: modbus_controller
+  #   address: 316
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 316"
+  # - platform: modbus_controller
+  #   address: 317
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 317"
+  # - platform: modbus_controller
+  #   address: 328
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 328"
+  # - platform: modbus_controller
+  #   address: 350
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 350"
+  # - platform: modbus_controller
+  #   address: 352
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 352"
+  # - platform: modbus_controller
+  #   address: 353
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 353"
+  # - platform: modbus_controller
+  #   address: 354
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 354"
+  # - platform: modbus_controller
+  #   address: 357
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 357"
+  # - platform: modbus_controller
+  #   address: 358
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 358"
+  # - platform: modbus_controller
+  #   address: 359
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 359"
+  # - platform: modbus_controller
+  #   address: 360
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 360"
+  # - platform: modbus_controller
+  #   address: 361
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 361"
+  # - platform: modbus_controller
+  #   address: 362
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 362"
+  # - platform: modbus_controller
+  #   address: 363
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 363"
+  # - platform: modbus_controller
+  #   address: 364
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 364"
+  # - platform: modbus_controller
+  #   address: 365
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 365"
+  # - platform: modbus_controller
+  #   address: 366
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 366"
+  # - platform: modbus_controller
+  #   address: 367
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 367"
+  # - platform: modbus_controller
+  #   address: 368
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 368"
+  # - platform: modbus_controller
+  #   address: 369
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 369"
+  # - platform: modbus_controller
+  #   address: 370
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 370"
+
+  - <<: &operation_mode_id
+      platform: modbus_controller
+      address: 201
+      register_type: holding
+      value_type: U_WORD
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} operation mode id"
+
+  - <<: *operation_mode_id
+    modbus_controller_id: smg1
+    name: "${name1} operation mode id"
+
+  - <<: *operation_mode_id
+    modbus_controller_id: smg2
+    name: "${name2} operation mode id"
+
+
+  # Effective mains voltage                              0.1V     Int   202 1 R
+  - <<: &AC_voltage
+      platform: modbus_controller
+      address: 202
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "V"
+      device_class: voltage
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} AC voltage"
+
+  - <<: *AC_voltage
+    modbus_controller_id: smg1
+    name: "${name1} AC voltage"
+
+  - <<: *AC_voltage
+    modbus_controller_id: smg2
+    name: "${name2} AC voltage"
+
+
+  # Mains Frequency                                      0.01Hz   Int   203 1 R
+  - <<: &AC_frequency
+      platform: modbus_controller
+      address: 203
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "Hz"
+      device_class: frequency
+      state_class: measurement
+      accuracy_decimals: 2
+      filters:
+        - multiply: 0.01
+    modbus_controller_id: smg0
+    name: "${name0} AC frequency"
+
+  - <<: *AC_frequency
+    modbus_controller_id: smg1
+    name: "${name1} AC frequency"
+
+  - <<: *AC_frequency
+    modbus_controller_id: smg2
+    name: "${name2} AC frequency"
+
+
+  # Average mains power                                  1W       Int   204 1 R
+  - <<: &average_mains_power
+      platform: modbus_controller
+      address: 204
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} average mains power"
+
+  - <<: *average_mains_power
+    modbus_controller_id: smg1
+    name: "${name1} average mains power"
+
+  - <<: *average_mains_power
+    modbus_controller_id: smg2
+    name: "${name2} average mains power"
+
+
+  # Effective inverter voltage                           0.1V     Int   205 1 R
+  - <<: &effective_inverter_voltage
+      platform: modbus_controller
+      address: 205
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "V"
+      device_class: voltage
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} effective inverter voltage"
+
+  - <<: *effective_inverter_voltage
+    modbus_controller_id: smg1
+    name: "${name1} effective inverter voltage"
+
+  - <<: *effective_inverter_voltage
+    modbus_controller_id: smg2
+    name: "${name2} effective inverter voltage"
+
+
+  # Effective inverter current                           0.1A     Int   206 1 R
+  - <<: &effective_inverter_current
+      platform: modbus_controller
+      address: 206
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} effective inverter current"
+
+  - <<: *effective_inverter_current
+    modbus_controller_id: smg1
+    name: "${name1} effective inverter current"
+
+  - <<: *effective_inverter_current
+    modbus_controller_id: smg2
+    name: "${name2} effective inverter current"
+
+
+  # Inverter frequency                                   0.01Hz   Int   207 1 R
+  - <<: &inverter_frequency
+      platform: modbus_controller
+      address: 207
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "Hz"
+      device_class: frequency
+      state_class: measurement
+      accuracy_decimals: 2
+      filters:
+        - multiply: 0.01
+    modbus_controller_id: smg0
+    name: "${name0} inverter frequency"
+
+  - <<: *inverter_frequency
+    modbus_controller_id: smg1
+    name: "${name1} inverter frequency"
+
+  - <<: *inverter_frequency
+    modbus_controller_id: smg2
+    name: "${name2} inverter frequency"
+
+
+  # Average inverter power                               1W       Int   208 1 R Positive numbers indicate inverter output, negative numbers indicate inverter input
+  - <<: &average_inverter_power
+      platform: modbus_controller
+      address: 208
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} average inverter power"
+
+  - <<: *average_inverter_power
+    modbus_controller_id: smg1
+    name: "${name1} average inverter power"
+
+  - <<: *average_inverter_power
+    modbus_controller_id: smg2
+    name: "${name2} average inverter power"
+
+
+  ###############################################################################
+  # NON FUNCTIONAL
+  # Inverter charging power                              1W       Int   209 1 R
+  - <<: &inverter_charging_power
+      platform: modbus_controller
+      address: 209
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} inverter charging power"
+
+  - <<: *inverter_charging_power
+    modbus_controller_id: smg1
+    name: "${name1} inverter charging power"
+
+  - <<: *inverter_charging_power
+    modbus_controller_id: smg2
+    name: "${name2} inverter charging power"
+
+
+  # Output effective voltage                             0.1V     Int   210 1 R
+  - <<: &output_effective_voltage
+      platform: modbus_controller
+      address: 210
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "V"
+      device_class: voltage
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} output effective voltage"
+
+  - <<: *output_effective_voltage
+    modbus_controller_id: smg1
+    name: "${name1} output effective voltage"
+
+  - <<: *output_effective_voltage
+    modbus_controller_id: smg2
+    name: "${name2} output effective voltage"
+
+
+  # Output effective current                             0.1A     Int   211 1 R
+  - <<: &output_effective_current
+      platform: modbus_controller
+      address: 211
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} output effective current"
+
+  - <<: *output_effective_current
+    modbus_controller_id: smg1
+    name: "${name1} output effective current"
+
+  - <<: *output_effective_current
+    modbus_controller_id: smg2
+    name: "${name2} output effective current"
+
+
+  # Output frequency                                     0.01Hz   Int   212 1 R
+  - <<: &output_frequency
+      platform: modbus_controller
+      address: 212
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "Hz"
+      device_class: frequency
+      state_class: measurement
+      accuracy_decimals: 2
+      filters:
+        - multiply: 0.01
+    modbus_controller_id: smg0
+    name: "${name0} output frequency"
+
+  - <<: *output_frequency
+    modbus_controller_id: smg1
+    name: "${name1} output frequency"
+
+  - <<: *output_frequency
+    modbus_controller_id: smg2
+    name: "${name2} output frequency"
+
+
+  # Output active power                                  1W       Int   213 1 R
+  - <<: &output_active_power
+      platform: modbus_controller
+      address: 213
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} output active power"
+
+  - <<: *output_active_power
+    modbus_controller_id: smg1
+    name: "${name1} output active power"
+
+  - <<: *output_active_power
+    modbus_controller_id: smg2
+    name: "${name2} output active power"
+
+
+  # Output apparent power                                1VA      Int   214 1 R
+  - <<: &output_apparent_power
+      platform: modbus_controller
+      address: 214
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "VA"
+      device_class: apparent_power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} output apparent power"
+
+  - <<: *output_apparent_power
+    modbus_controller_id: smg1
+    name: "${name1} output apparent power"
+
+  - <<: *output_apparent_power
+    modbus_controller_id: smg2
+    name: "${name2} output apparent power"
+
+
+  # Battery average voltage                              0.1V     Int   215 1 R
+  - <<: &battery_average_voltage
+      platform: modbus_controller
+      address: 215
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "V"
+      device_class: voltage
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} battery average voltage"
+
+  - <<: *battery_average_voltage
+    modbus_controller_id: smg1
+    name: "${name1} battery average voltage"
+
+  - <<: *battery_average_voltage
+    modbus_controller_id: smg2
+    name: "${name2} battery average voltage"
+
+
+  # Battery average current                              0.1A     Int   216 1 R
+  - <<: &battery_average_current
+      platform: modbus_controller
+      address: 216
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} battery average current"
+
+  - <<: *battery_average_current
+    modbus_controller_id: smg1
+    name: "${name1} battery average current"
+
+  - <<: *battery_average_current
+    modbus_controller_id: smg2
+    name: "${name2} battery average current"
+
+
+  # Battery average power                                1W       Int   217 1 R
+  - <<: &battery_average_power
+      platform: modbus_controller
+      address: 217
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+
+    modbus_controller_id: smg0
+    name: "${name0} battery average power"
+    id: smg0_battery_power
+  - <<: *battery_average_power
+    modbus_controller_id: smg1
+    name: "${name1} battery average power"
+    id: smg1_battery_power
+
+  - <<: *battery_average_power
+    modbus_controller_id: smg2
+    name: "${name2} battery average power"
+    id: smg2_battery_power
+
+
+  # PV average voltage                                   0.1V     Int   219 1 R
+  - <<: &pv_average_voltage
+      platform: modbus_controller
+      address: 219
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "V"
+      device_class: voltage
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+
+    modbus_controller_id: smg0
+    name: "${name0} PV average voltage"
+  - <<: *pv_average_voltage
+    modbus_controller_id: smg1
+    name: "${name1} PV average voltage"
+
+  - <<: *pv_average_voltage
+    modbus_controller_id: smg2
+    name: "${name2} PV average voltage"
+
+
+  # PV average current                                   0.1A     Int   220 1 R
+  - <<: &pv_average_current
+      platform: modbus_controller
+      address: 220
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+
+    modbus_controller_id: smg0
+    name: "${name0} PV average current"
+  - <<: *pv_average_current
+    modbus_controller_id: smg1
+    name: "${name1} PV average current"
+
+  - <<: *pv_average_current
+    modbus_controller_id: smg2
+    name: "${name2} PV average current"
+
+
+  # PV average power                                     1W       Int   223 1 R
+  - <<: &pv_average_power
+      platform: modbus_controller
+      address: 223
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    id: smg0_pv_average_power
+    name: "${name0} PV average power"
+
+  - <<: *pv_average_power
+    modbus_controller_id: smg1
+    id: smg1_pv_average_power
+    name: "${name1} PV average power"
+
+  - <<: *pv_average_power
+    modbus_controller_id: smg2
+    id: smg2_pv_average_power
+    name: "${name2} PV average power"
+
+
+  # PV charging average power                            1W       Int   224 1 R
+  - <<: &PV_charging_average_power
+      platform: modbus_controller
+      address: 224
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} PV charging average power"
+
+  - <<: *PV_charging_average_power
+    modbus_controller_id: smg1
+    name: "${name1} PV charging average power"
+
+  - <<: *PV_charging_average_power
+    modbus_controller_id: smg2
+    name: "${name2} PV charging average power"
+
+  # Power generation on the day                            0.01kWh  Uint  443 1 R
+  - <<: &inverter_PV_energy_today
+      platform: modbus_controller
+      address: 443
+      register_type: holding
+      value_type: U_WORD
+      unit_of_measurement: "kWh"
+      icon: mdi:solar-power
+      device_class: energy
+      state_class: total_increasing
+      accuracy_decimals: 2
+      filters:
+        - multiply: 0.01
+    modbus_controller_id: smg0
+    name: "${name0} inverter PV energy today"
+
+  - <<: *inverter_PV_energy_today
+    modbus_controller_id: smg1
+    name: "${name1} inverter PV energy today"
+
+  - <<: *inverter_PV_energy_today
+    modbus_controller_id: smg2
+    name: "${name2} inverter PV energy today"
+
+
+  # Load percentage                                      1%       Int   225 1 R
+  - <<: &load_percentage
+      platform: modbus_controller
+      address: 225
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "%"
+      # device_class: battery
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} load percentage"
+
+  - <<: *load_percentage
+    modbus_controller_id: smg1
+    name: "${name1} load percentage"
+
+  - <<: *load_percentage
+    modbus_controller_id: smg2
+    name: "${name2} load percentage"
+
+
+  # DC-DC Temperature                                     1°C      Int   226 1 R
+  - <<: &DC_DC_temperature
+      platform: modbus_controller
+      address: 226
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} DC-DC temperature"
+
+  - <<: *DC_DC_temperature
+    modbus_controller_id: smg1
+    name: "${name1} DC-DC temperature"
+
+  - <<: *DC_DC_temperature
+    modbus_controller_id: smg2
+    name: "${name2} DC-DC temperature"
+
+
+  # Inverter Temperature                                 1°C      Int   227 1 R
+  - <<: &inverter_temperature
+      platform: modbus_controller
+      address: 227
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} inverter temperature"
+
+  - <<: *inverter_temperature
+    modbus_controller_id: smg1
+    name: "${name1} inverter temperature"
+
+  - <<: *inverter_temperature
+    modbus_controller_id: smg2
+    name: "${name2} inverter temperature"
+
+
+  - <<: &temperature
+      platform: modbus_controller
+      address: 228
+      register_type: holding
+      value_type: S_WORD
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: "°C"
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} temperature"
+
+  - <<: *temperature
+    modbus_controller_id: smg1
+    name: "${name1} temperature"
+
+  - <<: *temperature
+    modbus_controller_id: smg2
+    name: "${name2} temperature"
+
+
+
+
+  # Battery state of charge                              1%       UInt  229 1 R
+  - <<: &battery_state_of_charge
+      platform: modbus_controller
+      address: 229
+      register_type: holding
+      value_type: U_WORD
+      unit_of_measurement: "%"
+      device_class: battery
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} battery state of charge"
+
+  - <<: *battery_state_of_charge
+    modbus_controller_id: smg1
+    name: "${name1} battery state of charge"
+
+  - <<: *battery_state_of_charge
+    modbus_controller_id: smg2
+    name: "${name2} battery state of charge"
+
+
+  # Battery average current                              0.1A     Int   232 1 R Positive number means charging, negative number means discharging
+  - <<: &battery_average_current2
+      platform: modbus_controller
+      address: 232
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} battery average current 2"
+
+  - <<: *battery_average_current2
+    modbus_controller_id: smg1
+    name: "${name1} battery average current 2"
+
+  - <<: *battery_average_current2
+    modbus_controller_id: smg2
+    name: "${name2} battery average current 2"
+
+
+  ###############################################################################
+  # NON FUNCTIONAL
+  # Inverter charging average current                    0.1A     Int   233 1 R
+  - <<: &inverter_charging_average_current
+      platform: modbus_controller
+      address: 233
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+    modbus_controller_id: smg0
+    name: "${name0} inverter charging average current"
+
+  - <<: *inverter_charging_average_current
+    modbus_controller_id: smg1
+    name: "${name1} inverter charging average current"
+
+  - <<: *inverter_charging_average_current
+    modbus_controller_id: smg2
+    name: "${name2} inverter charging average current"
+
+
+  # PV charging average current                          0.1A     Int   234 1 R
+  - <<: &PV_charging_average_current
+      platform: modbus_controller
+      address: 234
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "A"
+      device_class: current
+      state_class: measurement
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.1
+
+    modbus_controller_id: smg0
+    name: "${name0} PV charging average current"
+  - <<: *PV_charging_average_current
+    modbus_controller_id: smg1
+    name: "${name1} PV charging average current"
+
+  - <<: *PV_charging_average_current
+    modbus_controller_id: smg2
+    name: "${name2} PV charging average current"
+
+  - <<: &effective_inverter_power
+      platform: modbus_controller
+      address: 237
+      register_type: holding
+      value_type: S_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      state_class: measurement
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} effective inverter power"
+
+  - <<: *effective_inverter_power
+    modbus_controller_id: smg1
+    name: "${name1} effective inverter power"
+
+  - <<: *effective_inverter_power
+    modbus_controller_id: smg2
+    name: "${name2} effective inverter power"
+
+  # # Output voltage                                        0.1V    Uint  320 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} output voltage"
+  #   address: 320
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Output frequency setting                              0.01Hz  Uint  321 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} output frequency setting"
+  #   address: 321
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "Hz"
+  #   device_class: frequency
+  #   # state_class: measurement
+  #   accuracy_decimals: 2
+  #   filters:
+  #     - multiply: 0.01
+
+  # # Battery overvoltage protection point                  0.1V    Uint  323 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} battery overvoltage protection point"
+  #   address: 323
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Max charging voltage                                  0.1V    Uint  324 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} max charging voltage"
+  #   address: 324
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Floating charging voltage                             0.1V    Uint  325 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} floating charging voltage"
+  #   address: 325
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Battery discharge recovery point in mains mode        0.1V    Uint  326 1 R/W
+  # # Re-enables battery discharge after low-voltage protection; observed firmware requires this > register 327.
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} battery discharge recovery point in mains mode"
+  #   address: 326
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Voltage point back to utility source in SBU mode      0.1V    Uint  327 1 R/W
+  # # Manual requires this to be at least register 329 + 1.0V.
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} battery low voltage protection point in mains mode"
+  #   address: 327
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Low DC cut-off voltage                                0.1V    Uint  329 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} battery low voltage cut-off voltage"
+  #   address: 329
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Maximum charging current                              0.1A    Uint  332 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} max charging current"
+  #   address: 332
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "A"
+  #   device_class: current
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Maximum mains charging current                        0.1A    Uint  333 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} max mains charging current"
+  #   address: 333
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "A"
+  #   device_class: current
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # # Equalization Charging voltage                         0.1V    Uint  334 1 R/W
+  # - platform: modbus_controller
+  #   modbus_controller_id: smg0
+  #   name: "${name0} Equalization Charging voltage"
+  #   address: 334
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   unit_of_measurement: "V"
+  #   device_class: voltage
+  #   # state_class: measurement
+  #   accuracy_decimals: 1
+  #   filters:
+  #     - multiply: 0.1
+
+  # Rated power                                           W       Uint  643 1 R
+  - <<: &rated_power
+      platform: modbus_controller
+      address: 643
+      register_type: holding
+      value_type: U_WORD
+      unit_of_measurement: "W"
+      device_class: power
+      accuracy_decimals: 0
+    modbus_controller_id: smg0
+    name: "${name0} rated power"
+
+  - <<: *rated_power
+    modbus_controller_id: smg1
+    name: "${name1} rated power"
+
+  - <<: *rated_power
+    modbus_controller_id: smg2
+    name: "${name2} rated power"
+
+
+select:
+  # Output Mode                                                   Uint  300 1 R/W 0: Single, 1: Parallel, 2: 3 Phase-P1, 3: 3 Phase-P2, 4: 3 Phase-P3
+  - <<: &output_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 300
+      value_type: U_WORD
+      optionsmap:
+        "Single": 0
+        "Parallel": 1
+        "Phase P1": 2
+        "Phase P2": 3
+        "Phase P3": 4
+    modbus_controller_id: smg0
+    name: "${name0} output mode"
+
+  - <<: *output_mode
+    modbus_controller_id: smg1
+    name: "${name1} output mode"
+
+  - <<: *output_mode
+    modbus_controller_id: smg2
+    name: "${name2} output mode"
+
+
+  # Output priority                                               Uint  301 1 R/W 0: Utility-PV-Battery, 1: PV-Utility-Battery, 2: PV-Battery-Utility
+  - <<: &output_priority
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 301
+      value_type: U_WORD
+      optionsmap:
+        "Solar->Utility->Battery (SUB)": 1
+        "Solar->Battery->Utility (SBU)": 2
+        "Solar(+to grid)->Utility->Battery (SUF)": 3
+        "Solar(not to grid)->Battery->Utility (ZEC)": 4
+    modbus_controller_id: smg0
+    name: "${name0} output priority"
+
+  - <<: *output_priority
+    modbus_controller_id: smg1
+    name: "${name1} output priority"
+
+  - <<: *output_priority
+    modbus_controller_id: smg2
+    name: "${name2} output priority"
+
+
+  # Input voltage range                                           Uint  302 1 R/W 0: Wide range, 1: Narrow range
+  - <<: &input_voltage_range
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 302
+      value_type: U_WORD
+      optionsmap:
+        "90-280VAC (appliances)": 0
+        "170-280VAC (UPS)": 1
+        "170-280VAC (generator)": 2
+    modbus_controller_id: smg0
+    name: "${name0} input voltage range"
+
+  - <<: *input_voltage_range
+    modbus_controller_id: smg1
+    name: "${name1} input voltage range"
+
+  - <<: *input_voltage_range
+    modbus_controller_id: smg2
+    name: "${name2} input voltage range"
+
+
+  # Buzzer mode                                                   Uint  303 1 R/W 0: Mute in all situations, 1: Sound when the input source is changed or there is a specific warning or fault, 2: Sound when there is aspecific warning or fault, 3: Sound when fault occurs
+  - <<: &buzzer_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 303
+      value_type: U_WORD
+      optionsmap:
+        "Silent": 0
+        "Beep on input source changes, warnings and faults": 1
+        "Beep on warnings and faults": 2
+        "Beep on faults": 3
+    modbus_controller_id: smg0
+    name: "${name0} buzzer mode"
+
+  - <<: *buzzer_mode
+    modbus_controller_id: smg1
+    name: "${name1} buzzer mode"
+
+  - <<: *buzzer_mode
+    modbus_controller_id: smg2
+    name: "${name2} buzzer mode"
+
+
+  # LCD backlight                                                 Uint  305 1 R/W 0: Timed off, 1: Always on
+  - <<: &LCD_backlight
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 305
+      value_type: U_WORD
+      optionsmap:
+        "Timed off": 0
+        "Always on": 1
+    modbus_controller_id: smg0
+    name: "${name0} LCD backlight"
+
+  - <<: *LCD_backlight
+    modbus_controller_id: smg1
+    name: "${name1} LCD backlight"
+
+  - <<: *LCD_backlight
+    modbus_controller_id: smg2
+    name: "${name2} LCD backlight"
+
+  # Slave output priority
+  - <<: &slave_output_priority
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 318
+      value_type: U_WORD
+      optionsmap:
+        "Off": 0
+        "Solar->Utility->Battery (SUB)": 1
+        "Solar->Battery->Utility (SBU)": 2
+        "Solar(+to grid)->Utility->Battery (SUF)": 3
+        "Solar(not to grid)->Battery->Utility (ZEC)": 4
+    modbus_controller_id: smg0
+    name: "${name0} slave output priority"
+
+  - <<: *slave_output_priority
+    modbus_controller_id: smg1
+    name: "${name1} slave output priority"
+
+  - <<: *slave_output_priority
+    modbus_controller_id: smg2
+    name: "${name2} slave output priority"
+
+
+  # Battery Type                                                Uint 322 1 R/W 0:AGM; 1:FLD; 2:USER; 3:SMK1 4:PYL 5:FOX
+  - <<: &battery_type
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 322
+      value_type: U_WORD
+      optionsmap:
+        "AGM": 0
+        "FLD": 1
+        "USER": 2
+        "Li1 SMK1": 3
+        "Li2 PYL": 4
+        "Li3 FOX": 5
+        "Li4 STD": 6
+    modbus_controller_id: smg0
+    name: "${name0} battery type"
+
+  - <<: *battery_type
+    modbus_controller_id: smg1
+    name: "${name1} battery type"
+
+  - <<: *battery_type
+    modbus_controller_id: smg2
+    name: "${name2} battery type"
+
+
+  # Battery charging priority                                     Uint  331 1 R/W 0: Utility priority, 1: PV priority, 2: PV is at the same level as the Utility, 3: Only PV charging is allowed
+  - <<: &battery_charging_priority
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 331
+      value_type: U_WORD
+      optionsmap:
+        "PV priority (SoF)": 1
+        "PV is at the same level as the Utility (SMU)": 2
+        "Only PV charging is allowed (oSo)": 3
+        "Solar supports loads, then residual energy charges(Sor)": 4
+    modbus_controller_id: smg0
+    name: "${name0} battery charging priority"
+
+  - <<: *battery_charging_priority
+    modbus_controller_id: smg1
+    name: "${name1} battery charging priority"
+
+  - <<: *battery_charging_priority
+    modbus_controller_id: smg2
+    name: "${name2} battery charging priority"
+
+
+  # Slave battery charging priority                               Uint  331 1 R/W 0: Utility priority, 1: PV priority, 2: PV is at the same level as the Utility, 3: Only PV charging is allowed
+  - <<: &slave_battery_charging_priority
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 319
+      value_type: U_WORD
+      optionsmap:
+        "Off": 0
+        "PV priority (SoF)": 1
+        "PV is at the same level as the Utility (SMU)": 2
+        "Only PV charging is allowed (oSo)": 3
+        "Solar supports loads, then residual energy charges (Sor)": 4
+    modbus_controller_id: smg0
+    name: "${name0} Slave battery charging priority"
+
+  - <<: *slave_battery_charging_priority
+    modbus_controller_id: smg1
+    name: "${name1} Slave battery charging priority"
+
+  - <<: *slave_battery_charging_priority
+    modbus_controller_id: smg2
+    name: "${name2} Slave battery charging priority"
+
+
+  - platform: modbus_controller
+    address: 345
+    value_type: U_WORD
+    use_write_multiple: true
+    lambda: |-
+      id(slave_output_source_priority_start_time) = x;
+      return std::to_string((uint)(x / 100));
+    write_lambda: |-
+      uint m = value * 100 + (id(slave_output_source_priority_start_time) % 100);
+      id(slave_output_source_priority_start_time) = m;
+      return m;
+    optionsmap:
+      "0": 0
+      "1": 1
+      "2": 2
+      "3": 3
+      "4": 4
+      "5": 5
+      "6": 6
+      "7": 7
+      "8": 8
+      "9": 9
+      "10": 10
+      "11": 11
+      "12": 12
+      "13": 13
+      "14": 14
+      "15": 15
+      "16": 16
+      "17": 17
+      "18": 18
+      "19": 19
+      "20": 20
+      "21": 21
+      "22": 22
+      "23": 23
+    modbus_controller_id: smg0
+    name: "${name0} slave output source priority start hour"
+
+  - platform: modbus_controller
+    address: 345
+    value_type: U_WORD
+    use_write_multiple: true
+    lambda: |-
+      id(slave_output_source_priority_start_time) = x;
+      return std::to_string(x % 100);
+    write_lambda: |-
+      uint m = id(slave_output_source_priority_start_time);
+      m = m - (m % 100) + value;
+      id(slave_output_source_priority_start_time) = m;
+      return m;
+    optionsmap:
+      "0": 0
+      "1": 1
+      "2": 2
+      "3": 3
+      "4": 4
+      "5": 5
+      "6": 6
+      "7": 7
+      "8": 8
+      "9": 9
+      "10": 10
+      "11": 11
+      "12": 12
+      "13": 13
+      "14": 14
+      "15": 15
+      "16": 16
+      "17": 17
+      "18": 18
+      "19": 19
+      "20": 20
+      "21": 21
+      "22": 22
+      "23": 23
+      "24": 24
+      "25": 25
+      "26": 26
+      "27": 27
+      "28": 28
+      "29": 29
+      "30": 30
+      "31": 31
+      "32": 32
+      "33": 33
+      "34": 34
+      "35": 35
+      "36": 36
+      "37": 37
+      "38": 38
+      "39": 39
+      "40": 40
+      "41": 41
+      "42": 42
+      "43": 43
+      "44": 44
+      "45": 45
+      "46": 46
+      "47": 47
+      "48": 48
+      "49": 49
+      "50": 50
+      "51": 51
+      "52": 52
+      "53": 53
+      "54": 54
+      "55": 55
+      "56": 56
+      "57": 57
+      "58": 58
+      "59": 59
+    modbus_controller_id: smg0
+    name: "${name0} slave output source priority start minute"
+
+
+  # Turn on mode                                                  Uint  406 1 R/W 0: Can be turn-on locally or remotely, 1: Only local turn-on, 2: Only remote turn-on
+  - <<: &turn_on_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 406
+      value_type: U_WORD
+      optionsmap:
+        "Local and remotely turn-on allowed": 0
+        "Local turn-on only": 1
+        "Remote turn-on only": 2
+      lambda: |-
+        switch (x) {
+          case 16: return std::string("Local turn-on only");
+          case 32: return std::string("Remote turn-on only");
+          default: return {};
+        }
+    modbus_controller_id: smg0
+    name: "${name0} turn on mode"
+
+  - <<: *turn_on_mode
+    modbus_controller_id: smg1
+    name: "${name1} turn on mode"
+
+  - <<: *turn_on_mode
+    modbus_controller_id: smg2
+    name: "${name2} turn on mode"
+
+  - <<: &_340
+      platform: modbus_controller
+      address: 340
+      use_write_multiple: true
+      value_type: U_WORD
+      optionsmap:
+        "0": 0
+        "1": 1
+        "2": 2
+        "3": 3
+        "4": 4
+        "5": 5
+        "6": 6
+    modbus_controller_id: smg0
+    name: "${name0} 340"
+
+  - <<: *_340
+    modbus_controller_id: smg1
+    name: "${name1} 340"
+
+  - <<: *_340
+    modbus_controller_id: smg2
+    name: "${name2} 340"
+
+
+
+switch:
+  - platform: restart
+    name: "Restart ESP32 board"
+    id: restart_espjk
+
+  # LCD automatically returns to the homepage                     Uint  306 1 R/W 0: Do not return automatically, 1: Automatically return after 1 minute
+  - <<: &LCD_automatically_returns_to_homepage
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 306
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} LCD automatically returns to homepage"
+
+  - <<: *LCD_automatically_returns_to_homepage
+    modbus_controller_id: smg1
+    name: "${name1} LCD automatically returns to homepage"
+
+  - <<: *LCD_automatically_returns_to_homepage
+    modbus_controller_id: smg2
+    name: "${name2} LCD automatically returns to homepage"
+
+
+  # Energy-saving mode                                            Uint  307 1 R/W 0: Energy-saving mode is off, 1: Energy-saving mode is on
+  - <<: &energy_saving_mode
+      platform: modbus_controller
+      address: 307
+      #use_write_multiple: true
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} energy-saving mode"
+
+  - <<: *energy_saving_mode
+    modbus_controller_id: smg1
+    name: "${name1} energy-saving mode"
+
+  - <<: *energy_saving_mode
+    modbus_controller_id: smg2
+    name: "${name2} energy-saving mode"
+
+
+  # Overload automatic restart                                    Uint  308 1 R/W 0: Overload failure will not restart, 1: Automatic restart after overload failure
+  - <<: &overload_automatic_restart
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 308
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} overload automatic restart"
+
+  - <<: *overload_automatic_restart
+    modbus_controller_id: smg1
+    name: "${name1} overload automatic restart"
+
+  - <<: *overload_automatic_restart
+    modbus_controller_id: smg2
+    name: "${name2} overload automatic restart"
+
+
+  # Over temperature automatic restart                            Uint  309 1 R/W 0: Over temperature failure will not restart, 1: Automatic restart after over-temperature fault
+  - <<: &over_temperature_automatic_restart
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 309
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} over temperature automatic restart"
+
+  - <<: *over_temperature_automatic_restart
+    modbus_controller_id: smg1
+    name: "${name1} over temperature automatic restart"
+
+  - <<: *over_temperature_automatic_restart
+    modbus_controller_id: smg2
+    name: "${name2} over temperature automatic restart"
+
+
+  # Overload transfer to bypass enabled                           Uint  310 1 R/W 0: Disable, 1: Enable
+  - <<: &overload_transfer_to_bypass_enabled
+      platform: modbus_controller
+      #use_write_multiple: true
+      address: 310
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} overload transfer to bypass enabled"
+
+  - <<: *overload_transfer_to_bypass_enabled
+    modbus_controller_id: smg1
+    name: "${name1} overload transfer to bypass enabled"
+
+  - <<: *overload_transfer_to_bypass_enabled
+    modbus_controller_id: smg2
+    name: "${name2} overload transfer to bypass enabled"
+
+
+  # Parallel PV detection mode                                    Uint  311 1 R/W 0: Disable, 1: Enable
+  - <<: &parallel_PV_detection_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 311
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} parallel PV detection mode"
+
+  - <<: *parallel_PV_detection_mode
+    modbus_controller_id: smg1
+    name: "${name1} parallel PV detection mode"
+
+  - <<: *parallel_PV_detection_mode
+    modbus_controller_id: smg2
+    name: "${name2} parallel PV detection mode"
+
+
+  - <<: &external_CT_enabled
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 312
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} external CT"
+
+  - <<: *external_CT_enabled
+    modbus_controller_id: smg1
+    name: "${name1} external CT"
+
+  - <<: *external_CT_enabled
+    modbus_controller_id: smg2
+    name: "${name2} external CT"
+
+
+
+
+  # Equalization is enabled                          Uint  313 1 R/W 0: Disable, 1: Enable
+  - <<: &battery_equalization_mode_enabled
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 313
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} equalization enabled"
+
+  - <<: *battery_equalization_mode_enabled
+    modbus_controller_id: smg1
+    name: "${name1} equalization enabled"
+
+  - <<: *battery_equalization_mode_enabled
+    modbus_controller_id: smg2
+    name: "${name2} equalization enabled"
+
+
+  - <<: &auto_bypass
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 338
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} auto bypass"
+
+  - <<: *auto_bypass
+    modbus_controller_id: smg1
+    name: "${name1} auto bypass"
+
+  - <<: *auto_bypass
+    modbus_controller_id: smg2
+    name: "${name2} auto bypass"
+
+
+  - <<: &battery_automatic_activation_for_lithium_battery
+      platform: modbus_controller
+      address: 339
+      use_write_multiple: true
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} Battery automatic activation for lithium battery ?"
+
+  - <<: *battery_automatic_activation_for_lithium_battery
+    modbus_controller_id: smg1
+    name: "${name1} Battery automatic activation for lithium battery ?"
+
+  - <<: *battery_automatic_activation_for_lithium_battery
+    modbus_controller_id: smg2
+    name: "${name2} Battery automatic activation for lithium battery ?"
+
+
+  # Island detection enable                                       Uint  352 1 R/W 0: Disable, 1: Enable
+  - <<: &island_detection
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 352
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} island detection"
+
+  - <<: *island_detection
+    modbus_controller_id: smg1
+    name: "${name1} island detection"
+
+  - <<: *island_detection
+    modbus_controller_id: smg2
+    name: "${name2} island detection"
+
+
+  # Remote switch                                                 Uint  420 1 R/W 0: Remote shutdown, 1: Remote turn-on
+  - <<: &remote_switch
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 420
+      register_type: holding
+      bitmask: 1
+    modbus_controller_id: smg0
+    name: "${name0} remote switch"
+
+  - <<: *remote_switch
+    modbus_controller_id: smg1
+    name: "${name1} remote switch"
+
+  - <<: *remote_switch
+    modbus_controller_id: smg2
+    name: "${name2} remote switch"
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: ANJ ESP IP Address
+      address_0:
+        name: ANJ ESP IP Address 0
+      address_1:
+        name: ANJ ESP IP Address 1
+      address_2:
+        name: ANJ ESP IP Address 2
+      address_3:
+        name: ANJ ESP IP Address 3
+      address_4:
+        name: ANJ ESP IP Address 4
+    ssid:
+      name: ANJ ESP Connected SSID
+    bssid:
+      name: ANJ ESP Connected BSSID
+    mac_address:
+      name: ANJ ESP Mac Wifi Address
+    scan_results:
+      name: ANJ ESP Latest Scan Results
+    dns_address:
+      name: ANJ ESP DNS Address
+
+  - <<: &serial_number
+      platform: modbus_controller
+      address: 186
+      register_type: holding
+      response_size: 24
+      raw_encode: HEXBYTES
+      lambda: |-
+        char sn[13];
+        for (int i=0; i<12; i++) {
+          sn[i] = modbus_controller::word_from_hex_str(x, i);
+        }
+        sn[12] = '\0';
+        return std::string(&sn[0]);
+    modbus_controller_id: smg0
+    name: "${name0} serial number"
+
+  - <<: *serial_number
+    modbus_controller_id: smg1
+    name: "${name1} serial number"
+
+  - <<: *serial_number
+    modbus_controller_id: smg2
+    name: "${name2} serial number"
+
+  # Power flow status                                             UInt  231 1 R
+  - <<: &power_flow_status
+      platform: modbus_controller
+      address: 231
+      register_type: holding
+      response_size: 2
+      raw_encode: HEXBYTES
+      lambda: |-
+        const uint16_t mask = modbus_controller::word_from_hex_str(x, 0);
+        const uint8_t pv = (mask >> 0) & 0x03;
+        const uint8_t mains = (mask >> 2) & 0x03;
+        const uint8_t battery = (mask >> 4) & 0x03;
+        const uint8_t load = (mask >> 6) & 0x03;
+
+        std::string status;
+        switch (pv) {
+          case 0: status += "PV disconnected"; break;
+          case 1: status += "PV connected"; break;
+          default: status += "PV state "; status += std::to_string(pv);
+        }
+        status += "; ";
+
+        switch (mains) {
+          case 0: status += "mains disconnected"; break;
+          case 1: status += "mains connected"; break;
+          case 2: status += "inverter connected to grid"; break;
+          default: status += "mains state "; status += std::to_string(mains);
+        }
+        status += "; ";
+
+        switch (battery) {
+          case 0: status += "battery idle"; break;
+          case 1: status += "battery charging"; break;
+          case 2: status += "battery discharging"; break;
+          default: status += "battery state "; status += std::to_string(battery);
+        }
+        status += "; ";
+
+        switch (load) {
+          case 0: status += "load disconnected"; break;
+          case 1: status += "load connected"; break;
+          default: status += "load state "; status += std::to_string(load);
+        }
+
+        if (mask & (1 << 8)) status += "; AC charging";
+        if (mask & (1 << 9)) status += "; PV charging";
+        if (mask & (1 << 10)) status += "; battery icon off";
+        if (mask & (1 << 11)) status += "; PV icon off";
+        if (mask & (1 << 12)) status += "; mains icon off";
+        if (mask & (1 << 13)) status += "; load icon off";
+
+        return status;
+    modbus_controller_id: smg0
+    name: "${name0} power flow status"
+
+  - <<: *power_flow_status
+    modbus_controller_id: smg1
+    name: "${name1} power flow status"
+
+  - <<: *power_flow_status
+    modbus_controller_id: smg2
+    name: "${name2} power flow status"
+
+  # Fault code                                                    ULong 100 2 R
+  - <<: &fault
+      platform: modbus_controller
+      address: 100
+      register_type: holding
+      response_size: 4
+      raw_encode: HEXBYTES
+      lambda: |-
+        static const uint8_t FAULTS_SIZE = 29;
+        static const char *const FAULTS[FAULTS_SIZE] = {
+            "Over temperature of inverter module",                     // 0000 0000 0000 0000 0000 0000 0000 0001 (1)
+            "Over temperature of PV module",                           // 0000 0000 0000 0000 0000 0000 0000 0010 (2)
+            "Over temperature of DCDC module",                         // 0000 0000 0000 0000 0000 0000 0000 0100 (3)
+            "Battery over voltage",                                    // 0000 0000 0000 0000 0000 0000 0000 1000 (4)
+            "PV module over temperature",                              // 0000 0000 0000 0000 0000 0000 0001 0000 (5)
+            "Output short circuit",                                    // 0000 0000 0000 0000 0000 0000 0010 0000 (6)
+            "Inverter over voltage",                                   // 0000 0000 0000 0000 0000 0000 0100 0000 (7)
+            "Output over load",                                        // 0000 0000 0000 0000 0000 0000 1000 0000 (8)
+            "Bus over voltage",                                        // 0000 0000 0000 0000 0000 0001 0000 0000 (9)
+            "Bus soft start timed out",                                // 0000 0000 0000 0000 0000 0010 0000 0000 (10)
+            "PV over current",                                         // 0000 0000 0000 0000 0000 0100 0000 0000 (11)
+            "PV over voltage",                                         // 0000 0000 0000 0000 0000 1000 0000 0000 (12)
+            "Battery over current",                                    // 0000 0000 0000 0000 0001 0000 0000 0000 (13)
+            "Inverter over current",                                   // 0000 0000 0000 0000 0010 0000 0000 0000 (14)
+            "Bus low voltage",                                         // 0000 0000 0000 0000 0100 0000 0000 0000 (15)
+            "Reserve (Bit 15)",                                        // 0000 0000 0000 0000 1000 0000 0000 0000 (16)
+            "Inverter DC component is too high",                       // 0000 0000 0000 0001 0000 0000 0000 0000 (17)
+            "Reserve (Bit 17)",                                        // 0000 0000 0000 0010 0000 0000 0000 0000 (18)
+            "The zero bias of output current is too large",            // 0000 0000 0000 0100 0000 0000 0000 0000 (19)
+            "The zero bias of inverter current is too large",          // 0000 0000 0000 1000 0000 0000 0000 0000 (20)
+            "The zero bias of battery current is too large",           // 0000 0000 0001 0000 0000 0000 0000 0000 (21)
+            "The zero bias of PV current is too large",                // 0000 0000 0010 0000 0000 0000 0000 0000 (22)
+            "Inverter low voltage",                                    // 0000 0000 0100 0000 0000 0000 0000 0000 (23)
+            "Inverter negative power protection",                      // 0000 0000 1000 0000 0000 0000 0000 0000 (24)
+            "The host in the parallel system is lost",                 // 0000 0001 0000 0000 0000 0000 0000 0000 (25)
+            "Synchronization signal abnormal in the parallel system",  // 0000 0010 0000 0000 0000 0000 0000 0000 (26)
+            "The battery type is incompatible",                        // 0000 0100 0000 0000 0000 0000 0000 0000 (27)
+            "Parallel versions are incompatible",                      // 0000 1000 0000 0000 0000 0000 0000 0000 (28)
+            "External CT setup duplication",                           // 0001 0000 0000 0000 0000 0000 0000 0000 (29)
+        };
+        std::string values = "";
+
+        uint32_t mask = modbus_controller::dword_from_hex_str(x, 0);
+        if (mask) {
+          for (int i = 0; i < FAULTS_SIZE; i++) {
+            if (mask & (1 << i)) {
+              values.append(FAULTS[i]);
+              values.append(";");
+            }
+          }
+          if (!values.empty()) {
+            values.pop_back();
+          }
+        }
+        return values.length() ? values : "None";
+    modbus_controller_id: smg0
+    name: "${name0} fault"
+
+  - <<: *fault
+    modbus_controller_id: smg1
+    name: "${name1} fault"
+
+  - <<: *fault
+    modbus_controller_id: smg2
+    name: "${name2} fault"
+
+
+  # Warning code                                                  ULong 108 2 R
+  - <<: &warning
+      platform: modbus_controller
+      address: 108
+      register_type: holding
+      response_size: 4
+      raw_encode: HEXBYTES
+      lambda: |-
+        static const uint8_t WARNINGS_SIZE = 22;
+        static const char *const WARNINGS[WARNINGS_SIZE] = {
+            "Mains zero loss",                                             // 0000 0000 0000 0000 0000 0000 0000 0001 (1)
+            "Mains waveform abnormal",                                     // 0000 0000 0000 0000 0000 0000 0000 0010 (2)
+            "Mains overvoltage",                                           // 0000 0000 0000 0000 0000 0000 0000 0100 (3)
+            "Mains low voltage",                                           // 0000 0000 0000 0000 0000 0000 0000 1000 (4)
+            "Mains over frequency",                                        // 0000 0000 0000 0000 0000 0000 0001 0000 (5)
+            "Mains low frequency",                                         // 0000 0000 0000 0000 0000 0000 0010 0000 (6)
+            "PV low voltage",                                              // 0000 0000 0000 0000 0000 0000 0100 0000 (7)
+            "Over temperature",                                            // 0000 0000 0000 0000 0000 0000 1000 0000 (8)
+            "Battery low voltage",                                         // 0000 0000 0000 0000 0000 0001 0000 0000 (9)
+            "Battery is not connected",                                    // 0000 0000 0000 0000 0000 0010 0000 0000 (10)
+            "Overload",                                                    // 0000 0000 0000 0000 0000 0100 0000 0000 (11)
+            "Battery Eq charging",                                         // 0000 0000 0000 0000 0000 1000 0000 0000 (12)
+            "Battery undervoltage",                                        // 0000 0000 0000 0000 0001 0000 0000 0000 (13)
+            "Output power derating",                                       // 0000 0000 0000 0000 0010 0000 0000 0000 (14)
+            "Fan blocked",                                                 // 0000 0000 0000 0000 0100 0000 0000 0000 (15)
+            "PV energy is too low to be use",                              // 0000 0000 0000 0000 1000 0000 0000 0000 (16)
+            "Parallel communication interrupted",                          // 0000 0000 0000 0001 0000 0000 0000 0000 (17)
+            "Output mode of Single and Parallel systems inconsistent",     // 0000 0000 0000 0010 0000 0000 0000 0000 (18)
+            "Battery voltage difference of parallel system is too large",  // 0000 0000 0000 0100 0000 0000 0000 0000 (19)
+            "Lithium battery communication abnormal",                      // 0000 0000 0000 1000 0000 0000 0000 0000 (20)
+            "Battery discharge current exceeds the set value",             // 0000 0000 0001 0000 0000 0000 0000 0000 (21)
+            "Islanding detected",                                          // 0000 0000 0010 0000 0000 0000 0000 0000 (22)
+        };
+        std::string values = "";
+
+        uint32_t mask = modbus_controller::dword_from_hex_str(x, 0);
+        if (mask) {
+          for (int i = 0; i < WARNINGS_SIZE; i++) {
+            if (mask & (1 << i)) {
+              values.append(WARNINGS[i]);
+              values.append(";");
+            }
+          }
+          if (!values.empty()) {
+            values.pop_back();
+          }
+        }
+        return values.length() ? values : "None";
+    modbus_controller_id: smg0
+    name: "${name0} warning"
+
+  - <<: *warning
+    modbus_controller_id: smg1
+    name: "${name1} warning"
+
+  - <<: *warning
+    modbus_controller_id: smg2
+    name: "${name2} warning"
+
+
+  # Operation Mode                                                UInt  201 1 R 0: Power On, 1: Standby, 2: Mains, 3: Off-Grid, 4: Bypass, 5: Charging, 6: Fault
+  - <<: &operation_mode
+      platform: modbus_controller
+      address: 201
+      register_type: holding
+      raw_encode: HEXBYTES
+      lambda: |-
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        switch (value) {
+          case 0: return std::string("Power On");
+          case 1: return std::string("Standby");
+          case 2: return std::string("Mains");
+          case 3: return std::string("Off-Grid");
+          case 4: return std::string("Bypass");
+          case 5: return std::string("Charging");
+          case 6: return std::string("Fault");
+        }
+        return std::string("Unknown");
+    modbus_controller_id: smg0
+    name: "${name0} operation mode"
+
+  - <<: *operation_mode
+    modbus_controller_id: smg1
+    name: "${name1} operation mode"
+
+  - <<: *operation_mode
+    modbus_controller_id: smg2
+    name: "${name2} operation mode"
+
+
+  - platform: template
+    name: "ESP SNTP Time"
+    update_interval: 60s
+    lambda: |-
+      char str[25];
+      time_t curr_time = id(sntp_time).now().timestamp;
+      strftime(str, sizeof(str), "%Y-%m-%d %H:%M:%S", localtime(&curr_time));
+      return std::string(str);
+      
+number:
+  # Output voltage                                                0.1V    Uint  320 1 R/W
+  - <<: &output_voltage
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 320
+      register_type: holding
+      value_type: U_WORD
+      min_value: 220.0
+      max_value: 240.0
+      step: 10
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} output voltage"
+
+  - <<: *output_voltage
+    modbus_controller_id: smg1
+    name: "${name1} output voltage"
+
+  - <<: *output_voltage
+    modbus_controller_id: smg2
+    name: "${name2} output voltage"
+
+
+  # Output frequency target                                      0.01Hz  Uint  321 1 R/W
+  - <<: &output_frequency_target
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 321
+      register_type: holding
+      value_type: U_WORD
+      min_value: 50.0
+      max_value: 60.0
+      mode: box
+      # max_value: 600.0
+      # max_value: 100.0
+      step: 10.0
+      device_class: frequency
+      unit_of_measurement: "Hz"
+      lambda: "return 0.01f * x;"
+      write_lambda: |-
+        return 100.0f * x;
+    modbus_controller_id: smg0
+    name: "${name0} output frequency target"
+
+  - <<: *output_frequency_target
+    modbus_controller_id: smg1
+    name: "${name1} output frequency target"
+
+  - <<: *output_frequency_target
+    modbus_controller_id: smg2
+    name: "${name2} output frequency target"
+
+
+  # Battery overvoltage protection point                          0.1V    Uint  323 1 R/W
+  - <<: &battery_overvoltage_protection_point
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 323
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      # max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} battery overvoltage protection point"
+
+  - <<: *battery_overvoltage_protection_point
+    modbus_controller_id: smg1
+    name: "${name1} battery overvoltage protection point"
+
+  - <<: *battery_overvoltage_protection_point
+    modbus_controller_id: smg2
+    name: "${name2} battery overvoltage protection point"
+
+
+  # Bulk charging voltage (C.V voltage)                           0.1V    Uint  324 1 R/W
+  - <<: &bulk_charging_voltage
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 324
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} bulk charging voltage (C.V voltage)"
+
+  - <<: *bulk_charging_voltage
+    modbus_controller_id: smg1
+    name: "${name1} bulk charging voltage (C.V voltage)"
+
+  - <<: *bulk_charging_voltage
+    modbus_controller_id: smg2
+    name: "${name2} bulk charging voltage (C.V voltage)"
+
+
+  # Floating charging voltage                                     0.1V    Uint  325 1 R/W
+  - <<: &floating_charging_voltage
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 325
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      # max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} floating charging voltage"
+
+  - <<: *floating_charging_voltage
+    modbus_controller_id: smg1
+    name: "${name1} floating charging voltage"
+
+  - <<: *floating_charging_voltage
+    modbus_controller_id: smg2
+    name: "${name2} floating charging voltage"
+
+
+  # Battery discharge recovery point in mains mode                0.1V    Uint  326 1 R/W
+  # Re-enables battery discharge after low-voltage protection; observed firmware requires this > register 327.
+  - <<: &battery_discharge_recovery_point_in_mains_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 326
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      # max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} battery discharge recovery point in mains mode"
+
+  - <<: *battery_discharge_recovery_point_in_mains_mode
+    modbus_controller_id: smg1
+    name: "${name1} battery discharge recovery point in mains mode"
+
+  - <<: *battery_discharge_recovery_point_in_mains_mode
+    modbus_controller_id: smg2
+    name: "${name2} battery discharge recovery point in mains mode"
+
+
+  # Voltage point back to utility source in SBU mode               0.1V    Uint  327 1 R/W
+  # Manual requires this to be at least register 329 + 1.0V.
+  - <<: &voltage_point_back_to_utility_source_in_SBU_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 327
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      # max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} voltage point back to utility source in SBU mode"
+
+  - <<: *voltage_point_back_to_utility_source_in_SBU_mode
+    modbus_controller_id: smg1
+    name: "${name1} voltage point back to utility source in SBU mode"
+
+  - <<: *voltage_point_back_to_utility_source_in_SBU_mode
+    modbus_controller_id: smg2
+    name: "${name2} voltage point back to utility source in SBU mode"
+
+
+  # Low DC cut-off voltage                                        0.1V    Uint  329 1 R/W
+  - <<: &battery_low_voltage_cutoff_voltage
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 329
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      # max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} battery low voltage cut-off voltage"
+
+  - <<: *battery_low_voltage_cutoff_voltage
+    modbus_controller_id: smg1
+    name: "${name1} battery low voltage cut-off voltage"
+
+  - <<: *battery_low_voltage_cutoff_voltage
+    modbus_controller_id: smg2
+    name: "${name2} battery low voltage cut-off voltage"
+
+
+  - <<: &bulk_charging_time
+      platform: modbus_controller
+      address: 330
+      use_write_multiple: true
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 900.0
+      step: 5.0
+      unit_of_measurement: "min"
+    modbus_controller_id: smg0
+    name: "${name0} bulk charging time (C.V stage)"
+
+  - <<: *bulk_charging_time
+    modbus_controller_id: smg1
+    name: "${name1} bulk charging time (C.V stage)"
+
+  - <<: *bulk_charging_time
+    modbus_controller_id: smg2
+    name: "${name2} bulk charging time (C.V stage)"
+
+
+  # Maximum charging current                                      0.1A    Uint  332 1 R/W
+  - <<: &max_charging_current
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 332
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 100.0
+      step: 0.1
+      device_class: current
+      unit_of_measurement: "A"
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+
+    modbus_controller_id: smg0
+    name: "${name0} max charging current"
+
+  - <<: *max_charging_current
+    modbus_controller_id: smg1
+    name: "${name1} max charging current"
+
+  - <<: *max_charging_current
+    modbus_controller_id: smg2
+    name: "${name2} max charging current"
+
+
+  # Maximum mains charging current                                0.1A    Uint  333 1 R/W
+  - <<: &max_mains_charging_current
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 333
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "A"
+      device_class: current
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} max mains charging current"
+
+  - <<: *max_mains_charging_current
+    modbus_controller_id: smg1
+    name: "${name1} max mains charging current"
+
+  - <<: *max_mains_charging_current
+    modbus_controller_id: smg2
+    name: "${name2} max mains charging current"
+
+
+  # Eq charging voltage                                           0.1V    Uint  334 1 R/W
+  - <<: &eq_charging_voltage
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 334
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 100.0
+      step: 0.1
+      unit_of_measurement: "V"
+      device_class: voltage
+      lambda: "return x * 0.1f;"
+      write_lambda: |-
+        return x * 10.0f;
+    modbus_controller_id: smg0
+    name: "${name0} equalization charging voltage"
+
+  - <<: *eq_charging_voltage
+    modbus_controller_id: smg1
+    name: "${name1} equalization charging voltage"
+
+  - <<: *eq_charging_voltage
+    modbus_controller_id: smg2
+    name: "${name2} equalization charging voltage"
+
+
+  # Equalization time                                     min     Uint  335 1 R/W Range: 0~900
+  - <<: &battery_equalization_time
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 335
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 900.0
+      step: 1
+      unit_of_measurement: "min"
+    modbus_controller_id: smg0
+    name: "${name0} equalization time"
+
+  - <<: *battery_equalization_time
+    modbus_controller_id: smg1
+    name: "${name1} equalization time"
+
+  - <<: *battery_equalization_time
+    modbus_controller_id: smg2
+    name: "${name2} equalization time"
+
+
+  # Equalization timeout exit                                     min     Uint  336 1 R/W Range: 0~900
+  - <<: &equalization_timeout_exit
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 336
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 900.0
+      step: 1
+      unit_of_measurement: "min"
+    modbus_controller_id: smg0
+    name: "${name0} equalization timeout exit"
+
+  - <<: *equalization_timeout_exit
+    modbus_controller_id: smg1
+    name: "${name1} equalization timeout exit"
+
+  - <<: *equalization_timeout_exit
+    modbus_controller_id: smg2
+    name: "${name2} equalization timeout exit"
+
+
+  # Two equalization charging interval                           day     Uint  337 1 R/W Range: 1~90
+  - <<: &equalization_interval
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 337
+      register_type: holding
+      value_type: U_WORD
+      min_value: 0.0
+      max_value: 90.0
+      step: 1
+      unit_of_measurement: "day"
+    modbus_controller_id: smg0
+    name: "${name0} equalization interval"
+
+  - <<: *equalization_interval
+    modbus_controller_id: smg1
+    name: "${name1} equalization interval"
+
+  - <<: *equalization_interval
+    modbus_controller_id: smg2
+    name: "${name2} equalization interval"
+
+
+  # SOC point back to utility source in SBU mode                    1%    Uint  341 1 R/W
+  # Manual range: 10-50%.
+  - <<: &SOC_point_back_to_utility_source_in_SBU_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 341
+      register_type: holding
+      value_type: U_WORD
+      min_value: 10
+      max_value: 50
+      step: 1
+      unit_of_measurement: "%"
+    modbus_controller_id: smg0
+    name: "${name0} SOC point back to utility source in SBU mode"
+
+  - <<: *SOC_point_back_to_utility_source_in_SBU_mode
+    modbus_controller_id: smg1
+    name: "${name1} SOC point back to utility source in SBU mode"
+
+  - <<: *SOC_point_back_to_utility_source_in_SBU_mode
+    modbus_controller_id: smg2
+    name: "${name2} SOC point back to utility source in SBU mode"
+
+
+  # SOC point back to battery mode in SBU mode                      1%    Uint  342 1 R/W
+  # Manual range: 60-100%.
+  - <<: &SOC_point_back_to_battery_mode_in_SBU_mode
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 342
+      register_type: holding
+      value_type: U_WORD
+      min_value: 60
+      max_value: 100
+      step: 1
+      unit_of_measurement: "%"
+    modbus_controller_id: smg0
+    name: "${name0} SOC point back to battery mode in SBU mode"
+
+  - <<: *SOC_point_back_to_battery_mode_in_SBU_mode
+    modbus_controller_id: smg1
+    name: "${name1} SOC point back to battery mode in SBU mode"
+
+  - <<: *SOC_point_back_to_battery_mode_in_SBU_mode
+    modbus_controller_id: smg2
+    name: "${name2} SOC point back to battery mode in SBU mode"
+
+  # Low DC cut-off SOC                                              1%    Uint  343 1 R/W
+  # Manual range: 3-30%.
+  - <<: &low_DC_cut_off_SOC
+      platform: modbus_controller
+      address: 343
+      use_write_multiple: true
+      register_type: holding
+      value_type: U_WORD
+      min_value: 3
+      max_value: 30
+      step: 1
+      unit_of_measurement: "%"
+    modbus_controller_id: smg0
+    name: "${name0} low DC cut-off SOC"
+
+  - <<: *low_DC_cut_off_SOC
+    modbus_controller_id: smg1
+    name: "${name1} low DC cut-off SOC"
+
+  - <<: *low_DC_cut_off_SOC
+    modbus_controller_id: smg2
+    name: "${name2} low DC cut-off SOC"
+
+
+  - <<: &max_feedback_power_to_grid
+      platform: modbus_controller
+      address: 344
+      use_write_multiple: true
+      register_type: holding
+      device_class: power
+      value_type: U_WORD
+      min_value: 200
+      max_value: 6200
+      step: 1
+      unit_of_measurement: "W"
+    modbus_controller_id: smg0
+    name: "${name0} max feedback power to grid"
+
+  - <<: *max_feedback_power_to_grid
+    modbus_controller_id: smg1
+    name: "${name1} max feedback power to grid"
+
+  - <<: *max_feedback_power_to_grid
+    modbus_controller_id: smg2
+    name: "${name2} max feedback power to grid"
+
+  - platform: modbus_controller
+    address: 346
+    register_type: holding
+    use_write_multiple: true
+    value_type: U_WORD
+    lambda: "return x/100;"
+    write_lambda: "return x * 100;"
+    modbus_controller_id: smg0
+    name: "${name0} slave output source priority end time"
+  - platform: modbus_controller
+    address: 347
+    register_type: holding
+    use_write_multiple: true
+    value_type: U_WORD
+    lambda: "return x / 100;"
+    write_lambda: "return x * 100;"
+    modbus_controller_id: smg0
+    name: "${name0} slave charger source priority start time"
+  - platform: modbus_controller
+    address: 348
+    register_type: holding
+    use_write_multiple: true
+    value_type: U_WORD
+    lambda: "return x / 100;"
+    write_lambda: "return x * 100;"
+    modbus_controller_id: smg0
+    name: "${name0} slave charger source priority end time"
+
+
+  - <<: &external_CT_detection_error_compensation
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 349
+      register_type: holding
+      value_type: S_WORD
+      min_value: -100
+      max_value: 100
+      step: 1
+      lambda: "return x - 100;"
+      write_lambda: "return x + 100;"
+    modbus_controller_id: smg0
+    name: "${name0} external CT detection error compensation"
+
+  - <<: *external_CT_detection_error_compensation
+    modbus_controller_id: smg1
+    name: "${name1} external CT detection error compensation"
+
+  - <<: *external_CT_detection_error_compensation
+    modbus_controller_id: smg2
+    name: "${name2} external CT detection error compensation"
+
+
+  - <<: &battery_max_discharge_current_setting
+      platform: modbus_controller
+      use_write_multiple: true
+      address: 351
+      register_type: holding
+      value_type: U_WORD
+      device_class: current
+      min_value: 50
+      max_value: 500
+      step: 1
+      unit_of_measurement: "A"
+    modbus_controller_id: smg0
+    name: "${name0} battery max discharge current setting"
+
+  - <<: *battery_max_discharge_current_setting
+    modbus_controller_id: smg1
+    name: "${name1} battery max discharge current setting"
+
+  - <<: *battery_max_discharge_current_setting
+    modbus_controller_id: smg2
+    name: "${name2} battery max discharge current setting"
+
+
+  - <<: &unknown_value
+      platform: modbus_controller
+      address: 355
+      use_write_multiple: true
+      register_type: holding
+      value_type: S_WORD
+    modbus_controller_id: smg0
+    name: "${name0} 355 ? (5-300)"
+
+  - <<: *unknown_value
+    modbus_controller_id: smg1
+    name: "${name1} 355 ? (5-300)"
+
+  - <<: *unknown_value
+    modbus_controller_id: smg2
+    name: "${name2} 355 ? (5-300)"
+
+
+  - <<: &lithium_battery_activation_time
+      platform: modbus_controller
+      address: 356
+      use_write_multiple: true
+      register_type: holding
+      value_type: U_WORD
+      min_value: 6
+      max_value: 300
+      step: 1
+    modbus_controller_id: smg0
+    name: "${name0} lithium battery activation time in seconds"
+
+  - <<: *lithium_battery_activation_time
+    modbus_controller_id: smg1
+    name: "${name1} lithium battery activation time in seconds"
+
+  - <<: *lithium_battery_activation_time
+    modbus_controller_id: smg2
+    name: "${name2} lithium battery activation time in seconds"
+
+# Button entities
+
+button:
+  - platform: restart
+    name: "Restart ANJ ESP32 board"
+
+# Exit the fault mode                                           Uint  426   W   1: Exit the fault state(only when the inverter enters the fault mode , it could be available)
