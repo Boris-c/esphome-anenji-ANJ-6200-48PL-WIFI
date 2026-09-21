@@ -308,20 +308,41 @@ sensor:
   #   modbus_controller_id: smg0
   #   name: "${name0} 110"
 
-  - platform: modbus_controller
-    address: 112
-    id: "${name0}112"
-    register_type: holding
-    value_type: U_WORD
+  # Observed status/flag words. Not documented in public SMG/Vevor maps.
+  # 112 toggles with PV-low / PV-available state on A1.
+  # 113 toggles around power-flow / charging-vs-discharging transitions.
+  - <<: &status_word_112
+      platform: modbus_controller
+      address: 112
+      register_type: holding
+      value_type: U_WORD
     modbus_controller_id: smg0
-    name: "${name0} 112"
+    name: "${name0} status word 112"
 
-  - platform: modbus_controller
-    address: 113
-    register_type: holding
-    value_type: U_WORD
+  - <<: *status_word_112
+    modbus_controller_id: smg1
+    name: "${name1} status word 112"
+
+  - <<: *status_word_112
+    modbus_controller_id: smg2
+    name: "${name2} status word 112"
+
+  - <<: &status_word_113
+      platform: modbus_controller
+      address: 113
+      register_type: holding
+      value_type: U_WORD
     modbus_controller_id: smg0
-    name: "${name0} 113"
+    name: "${name0} status word 113"
+
+  - <<: *status_word_113
+    modbus_controller_id: smg1
+    name: "${name1} status word 113"
+
+  - <<: *status_word_113
+    modbus_controller_id: smg2
+    name: "${name2} status word 113"
+
   # - platform: modbus_controller
   #   address: 114
   #   register_type: holding
@@ -547,7 +568,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     modbus_controller_id: smg1
-    name: "${name0} 238 a2"
+    name: "${name1} 238 ?"
 
 
   - <<: *external_ct_sampling_power
@@ -562,7 +583,7 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     modbus_controller_id: smg2
-    name: "${name0} 238 a3"
+    name: "${name2} 238 ?"
 
   # - platform: modbus_controller
   #   address: 239
