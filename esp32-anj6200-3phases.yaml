@@ -3187,22 +3187,28 @@ number:
     name: "${name2} battery max discharge current setting"
 
 
-  - <<: &unknown_value
+  # Inferred from Vevor EM5500/EM6200 Modbus implementations:
+  # register 355 appears to be the mains power identification time, in seconds.
+  - <<: &mains_power_identification_time
       platform: modbus_controller
       address: 355
       use_write_multiple: true
       register_type: holding
-      value_type: S_WORD
+      value_type: U_WORD
+      min_value: 5
+      max_value: 300
+      step: 1
+      unit_of_measurement: "s"
     modbus_controller_id: smg0
-    name: "${name0} 355 ? (5-300)"
+    name: "${name0} mains power identification time"
 
-  - <<: *unknown_value
+  - <<: *mains_power_identification_time
     modbus_controller_id: smg1
-    name: "${name1} 355 ? (5-300)"
+    name: "${name1} mains power identification time"
 
-  - <<: *unknown_value
+  - <<: *mains_power_identification_time
     modbus_controller_id: smg2
-    name: "${name2} 355 ? (5-300)"
+    name: "${name2} mains power identification time"
 
 
   - <<: &lithium_battery_activation_time
