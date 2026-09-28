@@ -1772,15 +1772,15 @@ sensor:
       unit_of_measurement: "W"
       device_class: power
       accuracy_decimals: 0
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} rated power"
 
   - <<: *rated_power
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} rated power"
 
   - <<: *rated_power
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} rated power"
 
 
@@ -1797,15 +1797,15 @@ select:
         "Phase P1": 2
         "Phase P2": 3
         "Phase P3": 4
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} output mode"
 
   - <<: *output_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} output mode"
 
   - <<: *output_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} output mode"
 
 
@@ -1820,15 +1820,15 @@ select:
         "Solar->Battery->Utility (SBU)": 2
         "Solar(+to grid)->Utility->Battery (SUF)": 3
         "Solar(not to grid)->Battery->Utility (ZEC)": 4
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} output priority"
 
   - <<: *output_priority
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} output priority"
 
   - <<: *output_priority
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} output priority"
 
 
@@ -1842,15 +1842,15 @@ select:
         "90-280VAC (appliances)": 0
         "170-280VAC (UPS)": 1
         "170-280VAC (generator)": 2
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} input voltage range"
 
   - <<: *input_voltage_range
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} input voltage range"
 
   - <<: *input_voltage_range
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} input voltage range"
 
 
@@ -1865,15 +1865,15 @@ select:
         "Beep on input source changes, warnings and faults": 1
         "Beep on warnings and faults": 2
         "Beep on faults": 3
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} buzzer mode"
 
   - <<: *buzzer_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} buzzer mode"
 
   - <<: *buzzer_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} buzzer mode"
 
 
@@ -1886,15 +1886,15 @@ select:
       optionsmap:
         "Timed off": 0
         "Always on": 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} LCD backlight"
 
   - <<: *LCD_backlight
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} LCD backlight"
 
   - <<: *LCD_backlight
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} LCD backlight"
 
   # Slave output priority
@@ -1909,15 +1909,15 @@ select:
         "Solar->Battery->Utility (SBU)": 2
         "Solar(+to grid)->Utility->Battery (SUF)": 3
         "Solar(not to grid)->Battery->Utility (ZEC)": 4
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} slave output priority"
 
   - <<: *slave_output_priority
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} slave output priority"
 
   - <<: *slave_output_priority
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} slave output priority"
 
 
@@ -1935,15 +1935,15 @@ select:
         "Li2 PYL": 4
         "Li3 FOX": 5
         "Li4 STD": 6
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} battery type"
 
   - <<: *battery_type
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} battery type"
 
   - <<: *battery_type
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} battery type"
 
 
@@ -1958,15 +1958,15 @@ select:
         "PV is at the same level as the Utility (SMU)": 2
         "Only PV charging is allowed (oSo)": 3
         "Solar supports loads, then residual energy charges(Sor)": 4
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} battery charging priority"
 
   - <<: *battery_charging_priority
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} battery charging priority"
 
   - <<: *battery_charging_priority
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} battery charging priority"
 
 
@@ -1982,15 +1982,15 @@ select:
         "PV is at the same level as the Utility (SMU)": 2
         "Only PV charging is allowed (oSo)": 3
         "Solar supports loads, then residual energy charges (Sor)": 4
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} Slave battery charging priority"
 
   - <<: *slave_battery_charging_priority
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} Slave battery charging priority"
 
   - <<: *slave_battery_charging_priority
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} Slave battery charging priority"
 
 
@@ -2030,7 +2030,7 @@ select:
       "21": 21
       "22": 22
       "23": 23
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} slave output source priority start hour"
 
   - platform: modbus_controller
@@ -2106,7 +2106,7 @@ select:
       "57": 57
       "58": 58
       "59": 59
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} slave output source priority start minute"
 
 
@@ -2126,15 +2126,15 @@ select:
           case 32: return std::string("Remote turn-on only");
           default: return {};
         }
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} turn on mode"
 
   - <<: *turn_on_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} turn on mode"
 
   - <<: *turn_on_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} turn on mode"
 
   # Disabled unknown/probe register.
@@ -2176,15 +2176,15 @@ switch:
       address: 306
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} LCD automatically returns to homepage"
 
   - <<: *LCD_automatically_returns_to_homepage
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} LCD automatically returns to homepage"
 
   - <<: *LCD_automatically_returns_to_homepage
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} LCD automatically returns to homepage"
 
 
@@ -2195,15 +2195,15 @@ switch:
       #use_write_multiple: true
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} energy-saving mode"
 
   - <<: *energy_saving_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} energy-saving mode"
 
   - <<: *energy_saving_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} energy-saving mode"
 
 
@@ -2214,15 +2214,15 @@ switch:
       address: 308
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} overload automatic restart"
 
   - <<: *overload_automatic_restart
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} overload automatic restart"
 
   - <<: *overload_automatic_restart
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} overload automatic restart"
 
 
@@ -2233,15 +2233,15 @@ switch:
       address: 309
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} over temperature automatic restart"
 
   - <<: *over_temperature_automatic_restart
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} over temperature automatic restart"
 
   - <<: *over_temperature_automatic_restart
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} over temperature automatic restart"
 
 
@@ -2252,15 +2252,15 @@ switch:
       address: 310
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} overload transfer to bypass enabled"
 
   - <<: *overload_transfer_to_bypass_enabled
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} overload transfer to bypass enabled"
 
   - <<: *overload_transfer_to_bypass_enabled
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} overload transfer to bypass enabled"
 
 
@@ -2271,15 +2271,15 @@ switch:
       address: 311
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} parallel PV detection mode"
 
   - <<: *parallel_PV_detection_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} parallel PV detection mode"
 
   - <<: *parallel_PV_detection_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} parallel PV detection mode"
 
 
@@ -2289,15 +2289,15 @@ switch:
       address: 312
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} external CT"
 
   - <<: *external_CT_enabled
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} external CT"
 
   - <<: *external_CT_enabled
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} external CT"
 
 
@@ -2310,15 +2310,15 @@ switch:
       address: 313
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} equalization enabled"
 
   - <<: *battery_equalization_mode_enabled
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} equalization enabled"
 
   - <<: *battery_equalization_mode_enabled
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} equalization enabled"
 
 
@@ -2328,15 +2328,15 @@ switch:
       address: 338
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} auto bypass"
 
   - <<: *auto_bypass
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} auto bypass"
 
   - <<: *auto_bypass
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} auto bypass"
 
 
@@ -2346,15 +2346,15 @@ switch:
       use_write_multiple: true
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} Battery automatic activation for lithium battery ?"
 
   - <<: *battery_automatic_activation_for_lithium_battery
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} Battery automatic activation for lithium battery ?"
 
   - <<: *battery_automatic_activation_for_lithium_battery
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} Battery automatic activation for lithium battery ?"
 
 
@@ -2365,15 +2365,15 @@ switch:
       address: 352
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} island detection"
 
   - <<: *island_detection
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} island detection"
 
   - <<: *island_detection
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} island detection"
 
 
@@ -2384,15 +2384,15 @@ switch:
       address: 420
       register_type: holding
       bitmask: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} remote switch"
 
   - <<: *remote_switch
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} remote switch"
 
   - <<: *remote_switch
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} remote switch"
 
 
@@ -2434,15 +2434,15 @@ text_sensor:
         }
         sn[12] = '\0';
         return std::string(&sn[0]);
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} serial number"
 
   - <<: *serial_number
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} serial number"
 
   - <<: *serial_number
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} serial number"
 
   # Power flow status                                             UInt  231 1 R
@@ -2690,15 +2690,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} output voltage"
 
   - <<: *output_voltage
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} output voltage"
 
   - <<: *output_voltage
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} output voltage"
 
 
@@ -2720,15 +2720,15 @@ number:
       lambda: "return 0.01f * x;"
       write_lambda: |-
         return 100.0f * x;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} output frequency target"
 
   - <<: *output_frequency_target
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} output frequency target"
 
   - <<: *output_frequency_target
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} output frequency target"
 
 
@@ -2747,15 +2747,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} battery overvoltage protection point"
 
   - <<: *battery_overvoltage_protection_point
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} battery overvoltage protection point"
 
   - <<: *battery_overvoltage_protection_point
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} battery overvoltage protection point"
 
 
@@ -2774,15 +2774,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} bulk charging voltage (C.V voltage)"
 
   - <<: *bulk_charging_voltage
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} bulk charging voltage (C.V voltage)"
 
   - <<: *bulk_charging_voltage
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} bulk charging voltage (C.V voltage)"
 
 
@@ -2801,15 +2801,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} floating charging voltage"
 
   - <<: *floating_charging_voltage
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} floating charging voltage"
 
   - <<: *floating_charging_voltage
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} floating charging voltage"
 
 
@@ -2829,15 +2829,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} battery discharge recovery point in mains mode"
 
   - <<: *battery_discharge_recovery_point_in_mains_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} battery discharge recovery point in mains mode"
 
   - <<: *battery_discharge_recovery_point_in_mains_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} battery discharge recovery point in mains mode"
 
 
@@ -2857,15 +2857,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} voltage point back to utility source in SBU mode"
 
   - <<: *voltage_point_back_to_utility_source_in_SBU_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} voltage point back to utility source in SBU mode"
 
   - <<: *voltage_point_back_to_utility_source_in_SBU_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} voltage point back to utility source in SBU mode"
 
 
@@ -2884,15 +2884,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} battery low voltage cut-off voltage"
 
   - <<: *battery_low_voltage_cutoff_voltage
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} battery low voltage cut-off voltage"
 
   - <<: *battery_low_voltage_cutoff_voltage
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} battery low voltage cut-off voltage"
 
 
@@ -2906,15 +2906,15 @@ number:
       max_value: 900.0
       step: 5.0
       unit_of_measurement: "min"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} bulk charging time (C.V stage)"
 
   - <<: *bulk_charging_time
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} bulk charging time (C.V stage)"
 
   - <<: *bulk_charging_time
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} bulk charging time (C.V stage)"
 
 
@@ -2934,15 +2934,15 @@ number:
       write_lambda: |-
         return x * 10.0f;
 
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} max charging current"
 
   - <<: *max_charging_current
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} max charging current"
 
   - <<: *max_charging_current
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} max charging current"
 
 
@@ -2961,15 +2961,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} max mains charging current"
 
   - <<: *max_mains_charging_current
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} max mains charging current"
 
   - <<: *max_mains_charging_current
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} max mains charging current"
 
 
@@ -2988,15 +2988,15 @@ number:
       lambda: "return x * 0.1f;"
       write_lambda: |-
         return x * 10.0f;
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} equalization charging voltage"
 
   - <<: *eq_charging_voltage
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} equalization charging voltage"
 
   - <<: *eq_charging_voltage
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} equalization charging voltage"
 
 
@@ -3011,15 +3011,15 @@ number:
       max_value: 900.0
       step: 1
       unit_of_measurement: "min"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} equalization time"
 
   - <<: *battery_equalization_time
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} equalization time"
 
   - <<: *battery_equalization_time
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} equalization time"
 
 
@@ -3034,15 +3034,15 @@ number:
       max_value: 900.0
       step: 1
       unit_of_measurement: "min"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} equalization timeout exit"
 
   - <<: *equalization_timeout_exit
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} equalization timeout exit"
 
   - <<: *equalization_timeout_exit
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} equalization timeout exit"
 
 
@@ -3057,15 +3057,15 @@ number:
       max_value: 90.0
       step: 1
       unit_of_measurement: "day"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} equalization interval"
 
   - <<: *equalization_interval
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} equalization interval"
 
   - <<: *equalization_interval
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} equalization interval"
 
 
@@ -3081,15 +3081,15 @@ number:
       max_value: 50
       step: 1
       unit_of_measurement: "%"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} SOC point back to utility source in SBU mode"
 
   - <<: *SOC_point_back_to_utility_source_in_SBU_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} SOC point back to utility source in SBU mode"
 
   - <<: *SOC_point_back_to_utility_source_in_SBU_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} SOC point back to utility source in SBU mode"
 
 
@@ -3105,15 +3105,15 @@ number:
       max_value: 100
       step: 1
       unit_of_measurement: "%"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} SOC point back to battery mode in SBU mode"
 
   - <<: *SOC_point_back_to_battery_mode_in_SBU_mode
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} SOC point back to battery mode in SBU mode"
 
   - <<: *SOC_point_back_to_battery_mode_in_SBU_mode
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} SOC point back to battery mode in SBU mode"
 
   # Low DC cut-off SOC                                              1%    Uint  343 1 R/W
@@ -3128,15 +3128,15 @@ number:
       max_value: 30
       step: 1
       unit_of_measurement: "%"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} low DC cut-off SOC"
 
   - <<: *low_DC_cut_off_SOC
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} low DC cut-off SOC"
 
   - <<: *low_DC_cut_off_SOC
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} low DC cut-off SOC"
 
 
@@ -3151,15 +3151,15 @@ number:
       max_value: 6200
       step: 1
       unit_of_measurement: "W"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} max feedback power to grid"
 
   - <<: *max_feedback_power_to_grid
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} max feedback power to grid"
 
   - <<: *max_feedback_power_to_grid
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} max feedback power to grid"
 
   - platform: modbus_controller
@@ -3169,7 +3169,7 @@ number:
     value_type: U_WORD
     lambda: "return x/100;"
     write_lambda: "return x * 100;"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} slave output source priority end time"
   - platform: modbus_controller
     address: 347
@@ -3178,7 +3178,7 @@ number:
     value_type: U_WORD
     lambda: "return x / 100;"
     write_lambda: "return x * 100;"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} slave charger source priority start time"
   - platform: modbus_controller
     address: 348
@@ -3187,7 +3187,7 @@ number:
     value_type: U_WORD
     lambda: "return x / 100;"
     write_lambda: "return x * 100;"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} slave charger source priority end time"
 
 
@@ -3202,15 +3202,15 @@ number:
       step: 1
       lambda: "return x - 100;"
       write_lambda: "return x + 100;"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} external CT detection error compensation"
 
   - <<: *external_CT_detection_error_compensation
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} external CT detection error compensation"
 
   - <<: *external_CT_detection_error_compensation
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} external CT detection error compensation"
 
 
@@ -3225,15 +3225,15 @@ number:
       max_value: 500
       step: 1
       unit_of_measurement: "A"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} battery max discharge current setting"
 
   - <<: *battery_max_discharge_current_setting
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} battery max discharge current setting"
 
   - <<: *battery_max_discharge_current_setting
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} battery max discharge current setting"
 
 
@@ -3249,15 +3249,15 @@ number:
       max_value: 300
       step: 1
       unit_of_measurement: "s"
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} mains power identification time"
 
   - <<: *mains_power_identification_time
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} mains power identification time"
 
   - <<: *mains_power_identification_time
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} mains power identification time"
 
 
@@ -3270,15 +3270,15 @@ number:
       min_value: 6
       max_value: 300
       step: 1
-    modbus_controller_id: smg0
+    modbus_controller_id: smg0_slow
     name: "${name0} lithium battery activation time in seconds"
 
   - <<: *lithium_battery_activation_time
-    modbus_controller_id: smg1
+    modbus_controller_id: smg1_slow
     name: "${name1} lithium battery activation time in seconds"
 
   - <<: *lithium_battery_activation_time
-    modbus_controller_id: smg2
+    modbus_controller_id: smg2_slow
     name: "${name2} lithium battery activation time in seconds"
 
 # Button entities
