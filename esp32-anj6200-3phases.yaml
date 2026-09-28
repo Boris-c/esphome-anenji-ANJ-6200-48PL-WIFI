@@ -115,8 +115,8 @@ uart:
 modbus:
   - id: modbus0
     <<: &modbus_common
-      send_wait_time: 200ms
-      turnaround_time: 50ms
+      send_wait_time: 750ms
+      turnaround_time: 100ms
     uart_id: uart_0
 
   - id: modbus1
