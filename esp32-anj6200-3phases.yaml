@@ -446,13 +446,14 @@ sensor:
   #                                                                             5: Charging
   #                                                                             6: Fault
 
-  - platform: modbus_controller
-    address: 184
-    id: "${name0}184Invaliddata2"
-    register_type: holding
-    value_type: U_WORD
-    modbus_controller_id: smg0
-    name: "${name0} 184 Invalid data"
+  # Disabled probe: this register reports invalid data and adds Modbus traffic.
+  # - platform: modbus_controller
+  #   address: 184
+  #   id: "${name0}184Invaliddata2"
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 184 Invalid data"
   # - platform: modbus_controller
   #   address: 185
   #   register_type: holding
@@ -462,13 +463,14 @@ sensor:
   #   modbus_controller_id: smg0
   #   name: "${name0} 185"
 
-  - platform: modbus_controller
-    id: "${name0}200_"
-    address: 200
-    register_type: holding
-    value_type: U_WORD
-    modbus_controller_id: smg0
-    name: "${name0} 200 Invalid data Internal command"
+  # Disabled probe: this register reports invalid data/internal command.
+  # - platform: modbus_controller
+  #   id: "${name0}200_"
+  #   address: 200
+  #   register_type: holding
+  #   value_type: U_WORD
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 200 Invalid data Internal command"
 
   # DC bus voltage                                       0.1V     Uint  218 1 R
   - <<: &dc_bus_voltage
@@ -568,14 +570,15 @@ sensor:
     modbus_controller_id: smg0
     name: "${name0} CT power"
 
-  - platform: modbus_controller
-    address: 238
-    register_type: holding
-    value_type: S_WORD
-    state_class: measurement
-    accuracy_decimals: 0
-    modbus_controller_id: smg0
-    name: "${name0} 238 ?"
+  # Disabled unknown/probe register.
+  # - platform: modbus_controller
+  #   address: 238
+  #   register_type: holding
+  #   value_type: S_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 238 ?"
 
 
   - <<: *external_ct_sampling_power
@@ -583,14 +586,15 @@ sensor:
     modbus_controller_id: smg1
     name: "${name1} CT power"
 
-  - platform: modbus_controller
-    address: 238
-    register_type: holding
-    value_type: S_WORD
-    state_class: measurement
-    accuracy_decimals: 0
-    modbus_controller_id: smg1
-    name: "${name1} 238 ?"
+  # Disabled unknown/probe register.
+  # - platform: modbus_controller
+  #   address: 238
+  #   register_type: holding
+  #   value_type: S_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg1
+  #   name: "${name1} 238 ?"
 
 
   - <<: *external_ct_sampling_power
@@ -598,14 +602,15 @@ sensor:
     modbus_controller_id: smg2
     name: "${name2} CT power"
 
-  - platform: modbus_controller
-    address: 238
-    register_type: holding
-    value_type: S_WORD
-    state_class: measurement
-    accuracy_decimals: 0
-    modbus_controller_id: smg2
-    name: "${name2} 238 ?"
+  # Disabled unknown/probe register.
+  # - platform: modbus_controller
+  #   address: 238
+  #   register_type: holding
+  #   value_type: S_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg2
+  #   name: "${name2} 238 ?"
 
   # - platform: modbus_controller
   #   address: 239
@@ -697,23 +702,24 @@ sensor:
   #   modbus_controller_id: smg0
   #   name: "${name0} 311"
 
-  - platform: modbus_controller
-    address: 314
-    register_type: holding
-    value_type: S_WORD
-    state_class: measurement
-    accuracy_decimals: 0
-    modbus_controller_id: smg0
-    name: "${name0} 314"
+  # Disabled unknown/probe registers.
+  # - platform: modbus_controller
+  #   address: 314
+  #   register_type: holding
+  #   value_type: S_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 314"
 
-  - platform: modbus_controller
-    address: 315
-    register_type: holding
-    value_type: S_WORD
-    state_class: measurement
-    accuracy_decimals: 0
-    modbus_controller_id: smg0
-    name: "${name0} 315"
+  # - platform: modbus_controller
+  #   address: 315
+  #   register_type: holding
+  #   value_type: S_WORD
+  #   state_class: measurement
+  #   accuracy_decimals: 0
+  #   modbus_controller_id: smg0
+  #   name: "${name0} 315"
   # - platform: modbus_controller
   #   address: 316
   #   register_type: holding
@@ -2131,29 +2137,30 @@ select:
     modbus_controller_id: smg2
     name: "${name2} turn on mode"
 
-  - <<: &_340
-      platform: modbus_controller
-      address: 340
-      use_write_multiple: true
-      value_type: U_WORD
-      optionsmap:
-        "0": 0
-        "1": 1
-        "2": 2
-        "3": 3
-        "4": 4
-        "5": 5
-        "6": 6
-    modbus_controller_id: smg0
-    name: "${name0} 340"
+  # Disabled unknown/probe register.
+  # - <<: &_340
+  #     platform: modbus_controller
+  #     address: 340
+  #     use_write_multiple: true
+  #     value_type: U_WORD
+  #     optionsmap:
+  #       "0": 0
+  #       "1": 1
+  #       "2": 2
+  #       "3": 3
+  #       "4": 4
+  #       "5": 5
+  #       "6": 6
+  #   modbus_controller_id: smg0_slow
+  #   name: "${name0} 340"
 
-  - <<: *_340
-    modbus_controller_id: smg1
-    name: "${name1} 340"
+  # - <<: *_340
+  #   modbus_controller_id: smg1_slow
+  #   name: "${name1} 340"
 
-  - <<: *_340
-    modbus_controller_id: smg2
-    name: "${name2} 340"
+  # - <<: *_340
+  #   modbus_controller_id: smg2_slow
+  #   name: "${name2} 340"
 
 
 
