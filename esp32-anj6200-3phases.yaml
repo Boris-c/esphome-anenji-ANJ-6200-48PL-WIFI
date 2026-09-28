@@ -147,10 +147,12 @@ modbus_controller:
 
   # Slow controllers keep static/config registers from crowding the live
   # telemetry polls. ESPHome no longer supports per-entity skip_updates.
+  # They still need a periodic refresh so Home Assistant can recover state
+  # after HA/ESPHome reconnects.
   - id: smg0_slow
     <<: *modbus_controller_common
     <<: &modbus_controller_slow
-      update_interval: never
+      update_interval: 5min
     modbus_id: modbus0
 
   - id: smg1_slow
