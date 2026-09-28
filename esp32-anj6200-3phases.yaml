@@ -131,15 +131,36 @@ modbus_controller:
   - id: smg0
     <<: &modbus_controller_common
       address: 0x01
-      update_interval: 15s
+    <<: &modbus_controller_fast
+      update_interval: 10s
     modbus_id: modbus0
 
   - id: smg1
     <<: *modbus_controller_common
+    <<: *modbus_controller_fast
     modbus_id: modbus1
 
   - id: smg2
     <<: *modbus_controller_common
+    <<: *modbus_controller_fast
+    modbus_id: modbus2
+
+  # Slow controllers keep static/config registers from crowding the live
+  # telemetry polls. ESPHome no longer supports per-entity skip_updates.
+  - id: smg0_slow
+    <<: *modbus_controller_common
+    <<: &modbus_controller_slow
+      update_interval: never
+    modbus_id: modbus0
+
+  - id: smg1_slow
+    <<: *modbus_controller_common
+    <<: *modbus_controller_slow
+    modbus_id: modbus1
+
+  - id: smg2_slow
+    <<: *modbus_controller_common
+    <<: *modbus_controller_slow
     modbus_id: modbus2
 
 time:
