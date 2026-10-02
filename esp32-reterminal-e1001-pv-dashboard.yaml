@@ -176,13 +176,16 @@ http_request:
 image:
   - platform: online_image
     id: weather_image
-    url: "http://192.168.1.246:8077/weather.png"
+    url: "http://192.168.1.237:8077/weather.png"
     format: PNG
     type: BINARY
     resize: 762x254
     update_interval: 30min
     on_download_finished:
+      - logger.log: "weather_image download finished"
       - component.update: epaper_display
+    on_error:
+      - logger.log: "weather_image download FAILED"
 
 # ---------------------------------------------------------------------------
 # On-device trend graphs (3h rolling history, kept in RAM, resets on reboot)
