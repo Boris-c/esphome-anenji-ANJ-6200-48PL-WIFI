@@ -242,7 +242,7 @@ display:
         // ---- Row 2: Batterie SoC / Batterie charge-decharge ----
         it.horizontal_line(20, 270, 760);
         it.horizontal_line(20, 271, 760);
-        it.vertical_line(400, 285, 175);
+        it.vertical_line(400, 285, 160);
 
         it.printf(205, 300, id(font_label), TextAlign::TOP_CENTER, "Batterie");
         it.printf(205, 345, id(font_value), TextAlign::TOP_CENTER, "%.1f %%", id(battery_soc).state);
@@ -275,8 +275,8 @@ display:
 
       } else {
         // ==== PAGE 3/3: Aujourd'hui ====
-        it.vertical_line(280, 70, 350);
-        it.vertical_line(540, 70, 350);
+        it.vertical_line(280, 70, 290);
+        it.vertical_line(540, 70, 290);
 
         it.printf(150, 90, id(font_label), TextAlign::TOP_CENTER, "Production PV");
         it.printf(150, 200, id(font_value), TextAlign::TOP_CENTER, "%.1f", id(pv_energy_today).state);
