@@ -53,7 +53,7 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            id(page_index) = (id(page_index) + 1) % 4;
+            id(page_index) = (id(page_index) + 1) % 5;
         - component.update: epaper_display
 
   - platform: gpio
@@ -66,7 +66,7 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            id(page_index) = (id(page_index) + 3) % 4;
+            id(page_index) = (id(page_index) + 4) % 5;
         - component.update: epaper_display
 
 # ---------------------------------------------------------------------------
@@ -162,6 +162,27 @@ sensor:
     internal: true
 
 # ---------------------------------------------------------------------------
+# Weather tab: search.ch meteogram for Prevessin-Moens, rendered to a 1-bit
+# PNG server-side (SVG -> rsvg-convert -> ImageMagick threshold) by a local
+# script on this Mac (render_weather.sh, scheduled every 30 min via a
+# LaunchAgent) and served by a tiny local HTTP server (also a LaunchAgent).
+# ESPHome's online_image can't decode SVG directly, only BMP/JPEG/PNG/QOI.
+# ---------------------------------------------------------------------------
+http_request:
+  verify_ssl: false
+
+image:
+  - platform: online_image
+    id: weather_image
+    url: "http://192.168.1.246:8077/weather.png"
+    format: PNG
+    type: BINARY
+    resize: 762x254
+    update_interval: 30min
+    on_download_finished:
+      - component.update: epaper_display
+
+# ---------------------------------------------------------------------------
 # On-device trend graphs (3h rolling history, kept in RAM, resets on reboot)
 # ---------------------------------------------------------------------------
 graph:
@@ -235,12 +256,12 @@ display:
     lambda: |-
       // ---- Title + page indicator (shown on every page) ----
       it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
-      it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/4", id(page_index) + 1);
+      it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/5", id(page_index) + 1);
       it.horizontal_line(20, 52, 760);
       it.horizontal_line(20, 53, 760);
 
       if (id(page_index) == 0) {
-        // ==== PAGE 1/3: Live dashboard ====
+        // ==== PAGE 1/5: Live dashboard ====
         // ---- Row 1: PV / Maison / Reseau ----
         it.vertical_line(280, 70, 190);
         it.vertical_line(540, 70, 190);
@@ -275,7 +296,7 @@ display:
                   "Batterie: %.1f V | %.1f A", id(battery_voltage).state, id(battery_current).state);
 
       } else if (id(page_index) == 1) {
-        // ==== PAGE 2/3: Tendances (3 dernieres heures) ====
+        // ==== PAGE 2/5: Tendances (3 dernieres heures) ====
         it.printf(30, 62, id(font_label), TextAlign::TOP_LEFT, "Production PV");
         it.printf(770, 62, id(font_small), TextAlign::TOP_RIGHT, "%.0f W", id(pv_power).state);
         it.graph(25, 90, id(pv_graph));
@@ -291,7 +312,7 @@ display:
         it.graph(25, 336, id(grid_graph));
 
       } else if (id(page_index) == 2) {
-        // ==== PAGE 3/4: Aujourd'hui ====
+        // ==== PAGE 3/5: Aujourd'hui ====
         it.vertical_line(280, 70, 290);
         it.vertical_line(540, 70, 290);
 
@@ -312,8 +333,8 @@ display:
         it.printf(400, 375, id(font_label), TextAlign::TOP_CENTER, "Réseau (import) aujourd'hui");
         it.printf(400, 400, id(font_value), TextAlign::TOP_CENTER, "%.1f kWh", grid_today);
 
-      } else {
-        // ==== PAGE 4/4: Euros & autonomie ====
+      } else if (id(page_index) == 3) {
+        // ==== PAGE 4/5: Euros & autonomie ====
         float grid_import_kwh = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
         float grid_cost = id(grid_cost_today).state;
         float self_supplied_kwh = (id(pv_energy_today).state - id(battery_to_today).state) + id(battery_from_today).state;
@@ -335,4 +356,8 @@ display:
         it.printf(670, 90, id(font_label), TextAlign::TOP_CENTER, "Autonomie");
         it.printf(670, 200, id(font_value), TextAlign::TOP_CENTER, "%.0f %%", autonomie_pct);
         it.printf(670, 270, id(font_small), TextAlign::TOP_CENTER, "de la conso. aujourd'hui");
+
+      } else {
+        // ==== PAGE 5/5: Meteo (search.ch, Prevessin-Moens) ====
+        it.image(400, 220, id(weather_image), ImageAlign::CENTER);
       }
