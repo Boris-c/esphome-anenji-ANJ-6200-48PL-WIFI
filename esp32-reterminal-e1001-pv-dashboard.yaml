@@ -237,7 +237,7 @@ display:
         it.printf(670, 85, id(font_label), TextAlign::TOP_CENTER,
                   id(grid_power).state >= 0 ? "Réseau (import)" : "Réseau (export)");
         it.printf(670, 150, id(font_value), TextAlign::TOP_CENTER, "%s %.0f W",
-                  id(grid_power).state >= 0 ? "↑" : "↓", fabs(id(grid_power).state));
+                  id(grid_power).state >= 0 ? "↓" : "↑", fabs(id(grid_power).state));
 
         // ---- Row 2: Batterie SoC / Batterie charge-decharge ----
         it.horizontal_line(20, 270, 760);
@@ -270,7 +270,7 @@ display:
 
         it.printf(30, 308, id(font_label), TextAlign::TOP_LEFT, "Réseau (+ import / - export)");
         it.printf(770, 308, id(font_small), TextAlign::TOP_RIGHT, "%s %.0f W",
-                  id(grid_power).state >= 0 ? "↑" : "↓", fabs(id(grid_power).state));
+                  id(grid_power).state >= 0 ? "↓" : "↑", fabs(id(grid_power).state));
         it.graph(25, 336, id(grid_graph));
 
       } else {
