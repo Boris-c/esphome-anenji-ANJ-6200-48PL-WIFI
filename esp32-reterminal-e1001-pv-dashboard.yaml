@@ -180,7 +180,7 @@ font:
       - GF_Latin_Core
   - file: "gfonts://Inter@700"
     id: font_label
-    size: 22
+    size: 26
     glyphsets:
       - GF_Latin_Core
   - file: "gfonts://Inter@700"
