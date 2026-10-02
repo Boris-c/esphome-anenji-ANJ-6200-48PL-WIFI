@@ -327,7 +327,8 @@ display:
         it.printf(150, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", grid_cost);
         it.printf(150, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui (HC/HP)");
 
-        it.printf(410, 90, id(font_label), TextAlign::TOP_CENTER, "Économie autoconso.");
+        it.printf(410, 85, id(font_label), TextAlign::TOP_CENTER, "Économie");
+        it.printf(410, 117, id(font_label), TextAlign::TOP_CENTER, "autoconso.");
         it.printf(410, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", self_supplied_kwh * id(price_per_kwh).state);
         it.printf(410, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
 
