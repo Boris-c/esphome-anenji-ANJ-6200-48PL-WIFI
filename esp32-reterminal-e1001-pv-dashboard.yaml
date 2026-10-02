@@ -53,7 +53,7 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            id(page_index) = (id(page_index) + 1) % 3;
+            id(page_index) = (id(page_index) + 1) % 4;
         - component.update: epaper_display
 
   - platform: gpio
@@ -66,7 +66,7 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            id(page_index) = (id(page_index) + 2) % 3;
+            id(page_index) = (id(page_index) + 3) % 4;
         - component.update: epaper_display
 
 # ---------------------------------------------------------------------------
@@ -144,6 +144,12 @@ sensor:
     entity_id: sensor.anj_a3_edf_l3_energy_today
     internal: true
 
+  # Current electricity price (already accounts for HC/HP time-of-day tariff)
+  - platform: homeassistant
+    id: price_per_kwh
+    entity_id: sensor.electricity_price_per_kwh
+    internal: true
+
 # ---------------------------------------------------------------------------
 # On-device trend graphs (3h rolling history, kept in RAM, resets on reboot)
 # ---------------------------------------------------------------------------
@@ -189,14 +195,14 @@ font:
     glyphsets:
       - GF_Latin_Core
     glyphs:
-      - "↑↓"
+      - "↑↓€"
   - file: "gfonts://Inter@700"
     id: font_small
     size: 20
     glyphsets:
       - GF_Latin_Core
     glyphs:
-      - "↑↓"
+      - "↑↓€"
 
 spi:
   clk_pin: GPIO7
@@ -218,7 +224,7 @@ display:
     lambda: |-
       // ---- Title + page indicator (shown on every page) ----
       it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
-      it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/3", id(page_index) + 1);
+      it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/4", id(page_index) + 1);
       it.horizontal_line(20, 52, 760);
       it.horizontal_line(20, 53, 760);
 
@@ -273,8 +279,8 @@ display:
                   id(grid_power).state >= 0 ? "↓" : "↑", fabs(id(grid_power).state));
         it.graph(25, 336, id(grid_graph));
 
-      } else {
-        // ==== PAGE 3/3: Aujourd'hui ====
+      } else if (id(page_index) == 2) {
+        // ==== PAGE 3/4: Aujourd'hui ====
         it.vertical_line(280, 70, 290);
         it.vertical_line(540, 70, 290);
 
@@ -294,4 +300,28 @@ display:
         float grid_today = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
         it.printf(400, 375, id(font_label), TextAlign::TOP_CENTER, "Réseau (import) aujourd'hui");
         it.printf(400, 400, id(font_value), TextAlign::TOP_CENTER, "%.1f kWh", grid_today);
+
+      } else {
+        // ==== PAGE 4/4: Aujourd'hui, en euros (au tarif actuel) ====
+        float price = id(price_per_kwh).state;
+
+        it.vertical_line(280, 70, 290);
+        it.vertical_line(540, 70, 290);
+
+        it.printf(150, 90, id(font_label), TextAlign::TOP_CENTER, "Production PV");
+        it.printf(150, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", id(pv_energy_today).state * price);
+        it.printf(150, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
+
+        it.printf(410, 90, id(font_label), TextAlign::TOP_CENTER, "Vers batterie");
+        it.printf(410, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", id(battery_to_today).state * price);
+        it.printf(410, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
+
+        it.printf(670, 90, id(font_label), TextAlign::TOP_CENTER, "Depuis batterie");
+        it.printf(670, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", id(battery_from_today).state * price);
+        it.printf(670, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
+
+        it.horizontal_line(20, 360, 760);
+        float grid_today_kwh = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
+        it.printf(400, 375, id(font_label), TextAlign::TOP_CENTER, "Réseau (import) aujourd'hui");
+        it.printf(400, 400, id(font_value), TextAlign::TOP_CENTER, "%.2f €", grid_today_kwh * price);
       }
