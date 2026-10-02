@@ -42,29 +42,7 @@ globals:
     restore_value: false
     initial_value: '0'
 
-  # Running HC/HP split of today's grid import, accumulated on-device since boot.
-  # Resets to 0 on every reboot/OTA (RAM only), and auto-resets when the source
-  # "_today" sensors roll over at local midnight (detected as a negative delta).
-  - id: grid_today_last
-    type: float
-    restore_value: false
-    initial_value: '0'
-  - id: grid_hc_today_kwh
-    type: float
-    restore_value: false
-    initial_value: '0'
-  - id: grid_hp_today_kwh
-    type: float
-    restore_value: false
-    initial_value: '0'
-
 binary_sensor:
-  # Whether we're currently in the EDF "heures creuses" (off-peak) window
-  - platform: homeassistant
-    id: is_hc
-    entity_id: binary_sensor.batterie_heures_creuses_edf
-    internal: true
-
   - platform: gpio
     pin:
       number: GPIO4
@@ -172,38 +150,16 @@ sensor:
     entity_id: sensor.electricity_price_per_kwh
     internal: true
 
+  # Today's grid-import cost, correctly HC/HP-split server-side in HA:
+  # utility_meter (select.import_reseau + sensor.import_reseau_hc/_hp, sourced
+  # from template sensor.import_reseau_total) kept in sync with
+  # binary_sensor.batterie_heures_creuses_edf by automation
+  # "Tarif import reseau HC/HP", then priced by template sensor
+  # sensor.cout_import_reseau_aujourdhui. Durable across reboots/OTA.
   - platform: homeassistant
-    id: tarif_hc
-    entity_id: sensor.tarif_heures_creuses_ttc
+    id: grid_cost_today
+    entity_id: sensor.cout_import_reseau_aujourdhui
     internal: true
-
-  - platform: homeassistant
-    id: tarif_hp
-    entity_id: sensor.tarif_heures_pleines_ttc
-    internal: true
-
-  # Combined grid-import-today (sum of 3 phases), used to split HC/HP on delta
-  - platform: template
-    id: grid_today_total
-    unit_of_measurement: kWh
-    update_interval: 60s
-    internal: true
-    lambda: |-
-      return id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
-    on_value:
-      then:
-        - lambda: |-
-            float delta = x - id(grid_today_last);
-            if (delta < 0) {
-              // Daily rollover on the source sensors: start today's split fresh.
-              id(grid_hc_today_kwh) = 0;
-              id(grid_hp_today_kwh) = 0;
-            } else if (id(is_hc).state) {
-              id(grid_hc_today_kwh) += delta;
-            } else {
-              id(grid_hp_today_kwh) += delta;
-            }
-            id(grid_today_last) = x;
 
 # ---------------------------------------------------------------------------
 # On-device trend graphs (3h rolling history, kept in RAM, resets on reboot)
@@ -359,7 +315,7 @@ display:
       } else {
         // ==== PAGE 4/4: Euros & autonomie ====
         float grid_import_kwh = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
-        float grid_cost = id(grid_hc_today_kwh) * id(tarif_hc).state + id(grid_hp_today_kwh) * id(tarif_hp).state;
+        float grid_cost = id(grid_cost_today).state;
         float self_supplied_kwh = (id(pv_energy_today).state - id(battery_to_today).state) + id(battery_from_today).state;
         float autonomie_den = self_supplied_kwh + grid_import_kwh;
         float autonomie_pct = autonomie_den > 0 ? (self_supplied_kwh / autonomie_den) * 100.0 : 0.0;
