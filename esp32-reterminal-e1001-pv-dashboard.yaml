@@ -42,7 +42,29 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  # Running HC/HP split of today's grid import, accumulated on-device since boot.
+  # Resets to 0 on every reboot/OTA (RAM only), and auto-resets when the source
+  # "_today" sensors roll over at local midnight (detected as a negative delta).
+  - id: grid_today_last
+    type: float
+    restore_value: false
+    initial_value: '0'
+  - id: grid_hc_today_kwh
+    type: float
+    restore_value: false
+    initial_value: '0'
+  - id: grid_hp_today_kwh
+    type: float
+    restore_value: false
+    initial_value: '0'
+
 binary_sensor:
+  # Whether we're currently in the EDF "heures creuses" (off-peak) window
+  - platform: homeassistant
+    id: is_hc
+    entity_id: binary_sensor.batterie_heures_creuses_edf
+    internal: true
+
   - platform: gpio
     pin:
       number: GPIO4
@@ -149,6 +171,39 @@ sensor:
     id: price_per_kwh
     entity_id: sensor.electricity_price_per_kwh
     internal: true
+
+  - platform: homeassistant
+    id: tarif_hc
+    entity_id: sensor.tarif_heures_creuses_ttc
+    internal: true
+
+  - platform: homeassistant
+    id: tarif_hp
+    entity_id: sensor.tarif_heures_pleines_ttc
+    internal: true
+
+  # Combined grid-import-today (sum of 3 phases), used to split HC/HP on delta
+  - platform: template
+    id: grid_today_total
+    unit_of_measurement: kWh
+    update_interval: 60s
+    internal: true
+    lambda: |-
+      return id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
+    on_value:
+      then:
+        - lambda: |-
+            float delta = x - id(grid_today_last);
+            if (delta < 0) {
+              // Daily rollover on the source sensors: start today's split fresh.
+              id(grid_hc_today_kwh) = 0;
+              id(grid_hp_today_kwh) = 0;
+            } else if (id(is_hc).state) {
+              id(grid_hc_today_kwh) += delta;
+            } else {
+              id(grid_hp_today_kwh) += delta;
+            }
+            id(grid_today_last) = x;
 
 # ---------------------------------------------------------------------------
 # On-device trend graphs (3h rolling history, kept in RAM, resets on reboot)
@@ -302,26 +357,25 @@ display:
         it.printf(400, 400, id(font_value), TextAlign::TOP_CENTER, "%.1f kWh", grid_today);
 
       } else {
-        // ==== PAGE 4/4: Aujourd'hui, en euros (au tarif actuel) ====
-        float price = id(price_per_kwh).state;
+        // ==== PAGE 4/4: Euros & autonomie ====
+        float grid_import_kwh = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
+        float grid_cost = id(grid_hc_today_kwh) * id(tarif_hc).state + id(grid_hp_today_kwh) * id(tarif_hp).state;
+        float self_supplied_kwh = (id(pv_energy_today).state - id(battery_to_today).state) + id(battery_from_today).state;
+        float autonomie_den = self_supplied_kwh + grid_import_kwh;
+        float autonomie_pct = autonomie_den > 0 ? (self_supplied_kwh / autonomie_den) * 100.0 : 0.0;
 
         it.vertical_line(280, 70, 290);
         it.vertical_line(540, 70, 290);
 
-        it.printf(150, 90, id(font_label), TextAlign::TOP_CENTER, "Production PV");
-        it.printf(150, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", id(pv_energy_today).state * price);
-        it.printf(150, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
+        it.printf(150, 90, id(font_label), TextAlign::TOP_CENTER, "Coût réseau");
+        it.printf(150, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", grid_cost);
+        it.printf(150, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui (HC/HP)");
 
-        it.printf(410, 90, id(font_label), TextAlign::TOP_CENTER, "Vers batterie");
-        it.printf(410, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", id(battery_to_today).state * price);
+        it.printf(410, 90, id(font_label), TextAlign::TOP_CENTER, "Économie autoconso.");
+        it.printf(410, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", self_supplied_kwh * id(price_per_kwh).state);
         it.printf(410, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
 
-        it.printf(670, 90, id(font_label), TextAlign::TOP_CENTER, "Depuis batterie");
-        it.printf(670, 200, id(font_value), TextAlign::TOP_CENTER, "%.2f", id(battery_from_today).state * price);
-        it.printf(670, 270, id(font_small), TextAlign::TOP_CENTER, "€ aujourd'hui");
-
-        it.horizontal_line(20, 360, 760);
-        float grid_today_kwh = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
-        it.printf(400, 375, id(font_label), TextAlign::TOP_CENTER, "Réseau (import) aujourd'hui");
-        it.printf(400, 400, id(font_value), TextAlign::TOP_CENTER, "%.2f €", grid_today_kwh * price);
+        it.printf(670, 90, id(font_label), TextAlign::TOP_CENTER, "Autonomie");
+        it.printf(670, 200, id(font_value), TextAlign::TOP_CENTER, "%.0f %%", autonomie_pct);
+        it.printf(670, 270, id(font_small), TextAlign::TOP_CENTER, "de la conso. aujourd'hui");
       }
