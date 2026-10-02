@@ -121,7 +121,7 @@ display:
     update_interval: ${update_interval}
     lambda: |-
       // ---- Title ----
-      it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation Solaire");
+      it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
       it.horizontal_line(20, 52, 760);
       it.horizontal_line(20, 53, 760);
 
