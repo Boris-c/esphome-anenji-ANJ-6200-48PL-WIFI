@@ -34,7 +34,7 @@ ota:
   platform: esphome
 
 # ---------------------------------------------------------------------------
-# Page navigation (GPIO3 = green button = next, GPIO5 = left white button = prev)
+# Page navigation (GPIO4 = right white button = next, GPIO5 = left white button = prev)
 # ---------------------------------------------------------------------------
 globals:
   - id: page_index
@@ -45,7 +45,7 @@ globals:
 binary_sensor:
   - platform: gpio
     pin:
-      number: GPIO3
+      number: GPIO4
       mode: INPUT_PULLUP
       inverted: true
     id: button_next_page
@@ -257,11 +257,11 @@ display:
         it.printf(770, 62, id(font_small), TextAlign::TOP_RIGHT, "%.0f W", id(pv_power).state);
         it.graph(25, 90, id(pv_graph));
 
-        it.printf(30, 185, id(font_label), TextAlign::TOP_LEFT, "Batterie (+ charge / - decharge)");
+        it.printf(30, 185, id(font_label), TextAlign::TOP_LEFT, "Batterie (+ charge / - décharge)");
         it.printf(770, 185, id(font_small), TextAlign::TOP_RIGHT, "%.0f W", id(battery_power).state);
         it.graph(25, 213, id(battery_graph));
 
-        it.printf(30, 308, id(font_label), TextAlign::TOP_LEFT, "Reseau (+ import / - export)");
+        it.printf(30, 308, id(font_label), TextAlign::TOP_LEFT, "Réseau (+ import / - export)");
         it.printf(770, 308, id(font_small), TextAlign::TOP_RIGHT, "%.0f W", id(grid_power).state);
         it.graph(25, 336, id(grid_graph));
 
@@ -284,6 +284,6 @@ display:
 
         it.horizontal_line(20, 360, 760);
         float grid_today = id(grid_l1_today).state + id(grid_l2_today).state + id(grid_l3_today).state;
-        it.printf(400, 375, id(font_label), TextAlign::TOP_CENTER, "Reseau (import) aujourd'hui");
+        it.printf(400, 375, id(font_label), TextAlign::TOP_CENTER, "Réseau (import) aujourd'hui");
         it.printf(400, 400, id(font_value), TextAlign::TOP_CENTER, "%.1f kWh", grid_today);
       }
