@@ -188,11 +188,15 @@ font:
     size: 52
     glyphsets:
       - GF_Latin_Core
+    glyphs:
+      - "↑↓"
   - file: "gfonts://Inter@700"
     id: font_small
     size: 20
     glyphsets:
       - GF_Latin_Core
+    glyphs:
+      - "↑↓"
 
 spi:
   clk_pin: GPIO7
@@ -232,7 +236,8 @@ display:
 
         it.printf(670, 85, id(font_label), TextAlign::TOP_CENTER,
                   id(grid_power).state >= 0 ? "Réseau (import)" : "Réseau (export)");
-        it.printf(670, 150, id(font_value), TextAlign::TOP_CENTER, "%.0f W", fabs(id(grid_power).state));
+        it.printf(670, 150, id(font_value), TextAlign::TOP_CENTER, "%s %.0f W",
+                  id(grid_power).state >= 0 ? "↑" : "↓", fabs(id(grid_power).state));
 
         // ---- Row 2: Batterie SoC / Batterie charge-decharge ----
         it.horizontal_line(20, 270, 760);
@@ -244,7 +249,8 @@ display:
 
         it.printf(595, 300, id(font_label), TextAlign::TOP_CENTER,
                   id(battery_power).state >= 0 ? "Charge batterie" : "Décharge batterie");
-        it.printf(595, 345, id(font_value), TextAlign::TOP_CENTER, "%.0f W", fabs(id(battery_power).state));
+        it.printf(595, 345, id(font_value), TextAlign::TOP_CENTER, "%s %.0f W",
+                  id(battery_power).state >= 0 ? "↑" : "↓", fabs(id(battery_power).state));
 
         // ---- Footer: battery voltage / current ----
         it.horizontal_line(20, 445, 760);
@@ -258,11 +264,13 @@ display:
         it.graph(25, 90, id(pv_graph));
 
         it.printf(30, 185, id(font_label), TextAlign::TOP_LEFT, "Batterie (+ charge / - décharge)");
-        it.printf(770, 185, id(font_small), TextAlign::TOP_RIGHT, "%.0f W", id(battery_power).state);
+        it.printf(770, 185, id(font_small), TextAlign::TOP_RIGHT, "%s %.0f W",
+                  id(battery_power).state >= 0 ? "↑" : "↓", fabs(id(battery_power).state));
         it.graph(25, 213, id(battery_graph));
 
         it.printf(30, 308, id(font_label), TextAlign::TOP_LEFT, "Réseau (+ import / - export)");
-        it.printf(770, 308, id(font_small), TextAlign::TOP_RIGHT, "%.0f W", id(grid_power).state);
+        it.printf(770, 308, id(font_small), TextAlign::TOP_RIGHT, "%s %.0f W",
+                  id(grid_power).state >= 0 ? "↑" : "↓", fabs(id(grid_power).state));
         it.graph(25, 336, id(grid_graph));
 
       } else {
