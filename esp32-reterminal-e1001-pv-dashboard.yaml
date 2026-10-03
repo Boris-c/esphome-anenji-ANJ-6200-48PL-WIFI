@@ -48,6 +48,13 @@ globals:
     restore_value: false
     initial_value: '0'
 
+  # Set once Home Assistant has pushed real sensor data after boot/OTA, so we
+  # can force one immediate redraw instead of waiting up to update_interval.
+  - id: initial_data_shown
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
 binary_sensor:
   - platform: gpio
     pin:
@@ -180,7 +187,7 @@ sensor:
     pin: GPIO1
     id: device_battery_voltage
     internal: true
-    update_interval: 60s
+    update_interval: 15s
     attenuation: 12db
     filters:
       - multiply: 2.0  # voltage divider compensation, per Seeed cookbook
@@ -189,7 +196,7 @@ sensor:
     id: device_battery_level
     internal: true
     unit_of_measurement: "%"
-    update_interval: 60s
+    update_interval: 15s
     lambda: return id(device_battery_voltage).state;
     filters:
       - calibrate_linear:
@@ -257,6 +264,21 @@ graph:
     width: 750
     height: 90
     x_grid: 30min
+
+# ---------------------------------------------------------------------------
+# Catch up fast after boot/OTA: as soon as Home Assistant has pushed real
+# data (instead of waiting up to update_interval, i.e. 120s), force one
+# immediate redraw. Only fires once per boot.
+# ---------------------------------------------------------------------------
+interval:
+  - interval: 2s
+    then:
+      - lambda: |-
+          if (!id(initial_data_shown) &&
+              !std::isnan(id(pv_power).state) && !std::isnan(id(battery_soc).state)) {
+            id(initial_data_shown) = true;
+            id(epaper_display).update();
+          }
 
 # ---------------------------------------------------------------------------
 # Display
@@ -339,9 +361,9 @@ display:
         if (!std::isnan(lvl)) {
           int fill_w = (int) ((bw - 4) * (lvl / 100.0));
           if (fill_w > 0) it.filled_rectangle(bx + 2, by + 2, fill_w, bh - 4);
-        } else {
-          it.printf(bx + bw / 2, by + bh / 2, id(font_small), TextAlign::CENTER, "...");
         }
+        // No data yet: leave the outline empty rather than filling it or
+        // printing a placeholder — reads as "unknown", not "broken".
       }
       it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/5", id(page_index) + 1);
       it.horizontal_line(20, 52, 760);
