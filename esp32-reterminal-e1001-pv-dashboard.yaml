@@ -8,6 +8,10 @@ esphome:
   friendly_name: ${friendly_name}
   comment: "Seeed reTerminal E1001 - solar PV / battery dashboard"
   min_version: 2024.6.0
+  on_boot:
+    priority: 600
+    then:
+      - output.turn_on: device_battery_enable
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -70,6 +74,14 @@ binary_sensor:
         - lambda: |-
             id(page_index) = (id(page_index) + 4) % 5;
         - component.update: epaper_display
+
+# ---------------------------------------------------------------------------
+# reTerminal E1001 onboard battery measurement enable pin
+# ---------------------------------------------------------------------------
+output:
+  - platform: gpio
+    pin: GPIO21
+    id: device_battery_enable
 
 # ---------------------------------------------------------------------------
 # Home Assistant sensors
@@ -162,6 +174,40 @@ sensor:
     id: grid_cost_today
     entity_id: sensor.cout_import_reseau_aujourdhui
     internal: true
+
+  # ---- reTerminal E1001's own onboard battery (not the solar battery) ----
+  - platform: adc
+    pin: GPIO1
+    id: device_battery_voltage
+    internal: true
+    update_interval: 60s
+    attenuation: 12db
+    filters:
+      - multiply: 2.0  # voltage divider compensation, per Seeed cookbook
+
+  - platform: template
+    id: device_battery_level
+    internal: true
+    unit_of_measurement: "%"
+    update_interval: 60s
+    lambda: return id(device_battery_voltage).state;
+    filters:
+      - calibrate_linear:
+          - 4.15 -> 100.0
+          - 3.96 -> 90.0
+          - 3.91 -> 80.0
+          - 3.85 -> 70.0
+          - 3.80 -> 60.0
+          - 3.75 -> 50.0
+          - 3.68 -> 40.0
+          - 3.58 -> 30.0
+          - 3.49 -> 20.0
+          - 3.41 -> 10.0
+          - 3.30 -> 5.0
+          - 3.27 -> 0.0
+      - clamp:
+          min_value: 0
+          max_value: 100
 
 # ---------------------------------------------------------------------------
 # Weather tab: search.ch meteogram for Prevessin-Moens, rendered to a 1-bit
@@ -273,7 +319,19 @@ display:
 
       // ---- Title + page indicator (shown on every page) ----
       it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
-      it.printf(730, 14, id(font_small), TextAlign::TOP_RIGHT, "%s", fnum(id(battery_soc).state, "%.0f%%").c_str());
+      // Device's own onboard battery (not the solar battery): simple icon, no number
+      {
+        int bx = 740, by = 14, bw = 26, bh = 14;
+        it.rectangle(bx, by, bw, bh);
+        it.filled_rectangle(bx + bw, by + 4, 3, bh - 8);
+        float lvl = id(device_battery_level).state;
+        if (!std::isnan(lvl)) {
+          int fill_w = (int) ((bw - 4) * (lvl / 100.0));
+          if (fill_w > 0) it.filled_rectangle(bx + 2, by + 2, fill_w, bh - 4);
+        } else {
+          it.printf(bx + bw / 2, by + bh / 2, id(font_small), TextAlign::CENTER, "?");
+        }
+      }
       it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/5", id(page_index) + 1);
       it.horizontal_line(20, 52, 760);
       it.horizontal_line(20, 53, 760);
