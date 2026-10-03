@@ -339,15 +339,6 @@ display:
         return std::string(v >= 0 ? pos : neg);
       };
 
-      // Right after boot/OTA, Home Assistant hasn't pushed fresh sensor
-      // states yet (takes a few seconds). Rather than redraw the screen full
-      // of "...", skip this frame entirely: the e-paper is non-volatile, so
-      // it just keeps showing its last good content from before the reboot
-      // until real data arrives.
-      if (std::isnan(id(pv_power).state) && std::isnan(id(battery_soc).state)) {
-        return;
-      }
-
       // ---- Title + page indicator (shown on every page) ----
       it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
       // Device's own onboard battery (not the solar battery): simple icon, no number.
