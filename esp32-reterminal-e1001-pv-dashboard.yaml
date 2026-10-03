@@ -323,7 +323,7 @@ display:
       // Kept well clear of the "X/5" page indicator (TOP_RIGHT at x=780) and
       // vertically centered on its text line (text top y=14, ~20px tall).
       {
-        int bx = 690, by = 17, bw = 26, bh = 14;
+        int bx = 690, by = 19, bw = 26, bh = 14;
         it.rectangle(bx, by, bw, bh);
         it.filled_rectangle(bx + bw, by + 4, 3, bh - 8);
         float lvl = id(device_battery_level).state;
