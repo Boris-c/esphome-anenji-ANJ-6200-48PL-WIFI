@@ -305,9 +305,9 @@ display:
       inverted: true
     update_interval: ${update_interval}
     lambda: |-
-      // ---- Helpers: show "?" instead of "nan" for unavailable sensors ----
+      // ---- Helpers: show "..." instead of "nan" for unavailable sensors ----
       auto fnum = [](float v, const char *fmt) -> std::string {
-        if (std::isnan(v)) return std::string("?");
+        if (std::isnan(v)) return std::string("...");
         char buf[24];
         snprintf(buf, sizeof(buf), fmt, v);
         return std::string(buf);
@@ -319,9 +319,11 @@ display:
 
       // ---- Title + page indicator (shown on every page) ----
       it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
-      // Device's own onboard battery (not the solar battery): simple icon, no number
+      // Device's own onboard battery (not the solar battery): simple icon, no number.
+      // Kept well clear of the "X/5" page indicator (TOP_RIGHT at x=780) and
+      // vertically centered on its text line (text top y=14, ~20px tall).
       {
-        int bx = 740, by = 14, bw = 26, bh = 14;
+        int bx = 690, by = 17, bw = 26, bh = 14;
         it.rectangle(bx, by, bw, bh);
         it.filled_rectangle(bx + bw, by + 4, 3, bh - 8);
         float lvl = id(device_battery_level).state;
@@ -329,7 +331,7 @@ display:
           int fill_w = (int) ((bw - 4) * (lvl / 100.0));
           if (fill_w > 0) it.filled_rectangle(bx + 2, by + 2, fill_w, bh - 4);
         } else {
-          it.printf(bx + bw / 2, by + bh / 2, id(font_small), TextAlign::CENTER, "?");
+          it.printf(bx + bw / 2, by + bh / 2, id(font_small), TextAlign::CENTER, "...");
         }
       }
       it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/5", id(page_index) + 1);
