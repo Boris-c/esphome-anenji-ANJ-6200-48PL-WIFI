@@ -273,6 +273,7 @@ display:
 
       // ---- Title + page indicator (shown on every page) ----
       it.printf(400, 8, id(font_title), TextAlign::TOP_CENTER, "Installation solaire");
+      it.printf(730, 14, id(font_small), TextAlign::TOP_RIGHT, "%s", fnum(id(battery_soc).state, "%.0f%%").c_str());
       it.printf(780, 14, id(font_small), TextAlign::TOP_RIGHT, "%d/5", id(page_index) + 1);
       it.horizontal_line(20, 52, 760);
       it.horizontal_line(20, 53, 760);
