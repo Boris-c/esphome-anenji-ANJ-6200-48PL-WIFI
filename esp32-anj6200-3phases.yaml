@@ -172,13 +172,9 @@ time:
   - platform: sntp
     timezone: Europe/Paris
     id: sntp_time
-    on_time:
-      # Every 6 hours, restart ESP (might not be necessary)
-      - seconds: 0
-        minutes: 0
-        hours: 1
-        then:
-          - switch.toggle: restart_espjk
+    # No scheduled restart: it was the cause of a nightly 01:00 telemetry gap
+    # (entities unavailable 6-19 s, up to ~2 min when the Wi-Fi reconnect is slow).
+    # The "Restart ESP32 board" switch/button remains available for manual use.
 
 sensor:
   - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
